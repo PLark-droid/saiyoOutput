@@ -1,0 +1,36 @@
+# Economic Governance Configuration
+# AGENTS.md v5.0 - Economic Governance Protocol準拠
+
+# 月次予算 (USD)
+monthly_budget_usd: 500
+
+# しきい値設定
+thresholds:
+  # 警告しきい値 (80% = 0.8)
+  warning: 0.8
+  # 緊急しきい値 (150% = 1.5)
+  emergency: 1.5
+
+# サービス別予算配分
+service_budgets:
+  anthropic_api: 400  # Claude API
+  firebase: 100       # Firebase/GCP
+
+# 緊急時アクション
+emergency_actions:
+  # 緊急時に無効化するワークフロー
+  disable_workflows:
+    - autonomous-agent.yml
+    - state-machine.yml
+
+# 通知設定
+notifications:
+  # Slack通知 (将来実装)
+  slack_webhook: ""
+  # メール通知 (将来実装)
+  email: ""
+
+# メトリクス保存設定
+metrics:
+  retention_days: 90
+  storage_path: .ai/metrics/cost-history
