@@ -7,6 +7,10 @@ on:
   issues:
     types: [closed, reopened]
 
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   update-status:
     runs-on: ubuntu-latest
@@ -15,77 +19,64 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Dependencies
-        run: npm ci
-
       - name: Update Project Status
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
           EVENT_ACTION: ${{ github.event.action }}
+          EVENT_TYPE: ${{ github.event_name }}
         run: |
-          cat > update-status.ts << 'EOF'
-          import { ProjectsV2Client } from './agents/github/projects-v2.js';
+          echo "═══════════════════════════════════════"
+          echo "📊 Update Project Status"
+          echo "═══════════════════════════════════════"
+          echo "Event Type: $EVENT_TYPE"
+          echo "Action: $EVENT_ACTION"
+          echo "Issue/PR Number: #$ISSUE_NUMBER"
+          echo "═══════════════════════════════════════"
 
-          async function main() {
-            const token = process.env.GITHUB_TOKEN!;
-            const issueNumber = parseInt(process.env.ISSUE_NUMBER!);
-            const action = process.env.EVENT_ACTION!;
+          # Determine new status based on action
+          case "$EVENT_ACTION" in
+            opened)
+              STATUS="Todo"
+              LABEL_ADD="📥 state:pending"
+              ;;
+            closed)
+              STATUS="Done"
+              LABEL_ADD="✅ state:done"
+              LABEL_REMOVE="📥 state:pending,🏗️ state:implementing,👀 state:reviewing"
+              ;;
+            reopened)
+              STATUS="In Progress"
+              LABEL_ADD="🏗️ state:implementing"
+              LABEL_REMOVE="✅ state:done"
+              ;;
+            *)
+              echo "ℹ️ No status update needed for action: $EVENT_ACTION"
+              exit 0
+              ;;
+          esac
 
-            const [owner, repo] = process.env.GITHUB_REPOSITORY!.split('/');
+          echo "📝 New Status: $STATUS"
 
-            const client = new ProjectsV2Client(token, {
-              owner,
-              repo,
-              projectNumber: 1, // Adjust as needed
-            });
+          # Update labels if it's an issue event
+          if [ "$EVENT_TYPE" = "issues" ]; then
+            echo "🏷️ Updating labels..."
 
-            await client.initialize();
+            # Add new state label
+            if [ -n "$LABEL_ADD" ]; then
+              gh issue edit "$ISSUE_NUMBER" --add-label "$LABEL_ADD" 2>/dev/null || true
+            fi
 
-            // Get issue node ID
-            const issueNodeId = await client.getIssueNodeId(issueNumber);
+            # Remove old state labels
+            if [ -n "$LABEL_REMOVE" ]; then
+              IFS=',' read -ra LABELS <<< "$LABEL_REMOVE"
+              for label in "${LABELS[@]}"; do
+                gh issue edit "$ISSUE_NUMBER" --remove-label "$label" 2>/dev/null || true
+              done
+            fi
+          fi
 
-            // Add to project if not already added
-            let itemId: string;
-            try {
-              itemId = await client.addIssueToProject(issueNodeId);
-              console.log(`Added issue #${issueNumber} to project`);
-            } catch (error: any) {
-              if (error.message.includes('already exists')) {
-                console.log(`Issue #${issueNumber} already in project`);
-                // Get existing item ID (simplified - in production, fetch from GraphQL)
-                return;
-              }
-              throw error;
-            }
-
-            // Update status based on action
-            let status: string;
-            switch (action) {
-              case 'opened':
-                status = 'Todo';
-                break;
-              case 'closed':
-                status = 'Done';
-                break;
-              case 'reopened':
-                status = 'In Progress';
-                break;
-              default:
-                console.log(`Unknown action: ${action}`);
-                return;
-            }
-
-            await client.updateStatus(itemId, status);
-            console.log(`Updated issue #${issueNumber} status to: ${status}`);
-          }
-
-          main().catch(console.error);
-          EOF
-
-          npx tsx update-status.ts
+          echo ""
+          echo "═══════════════════════════════════════"
+          echo "✅ Status update complete: $STATUS"
+          echo "═══════════════════════════════════════"
