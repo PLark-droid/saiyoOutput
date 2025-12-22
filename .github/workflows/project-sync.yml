@@ -14,8 +14,35 @@ jobs:
       pull-requests: read
 
     steps:
+      - name: Check if Project exists
+        id: check-project
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Try to get project info - if it fails, skip the sync
+          if gh project list --owner "${{ github.repository_owner }}" --limit 1 2>/dev/null | grep -q "1"; then
+            echo "project_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "project_exists=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No GitHub Project found. Skipping sync."
+          fi
+
       - name: Sync to GitHub Projects
+        if: steps.check-project.outputs.project_exists == 'true'
         uses: actions/add-to-project@v0.5.0
         with:
-          project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/1
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Use users/ for user-owned repos, orgs/ for organization repos
+          project-url: https://github.com/users/${{ github.repository_owner }}/projects/1
+          github-token: ${{ secrets.GH_PROJECT_TOKEN }}
+        continue-on-error: true
+
+      - name: Log sync status
+        run: |
+          echo "═══════════════════════════════════════"
+          echo "📊 Sync Issues to Project"
+          echo "═══════════════════════════════════════"
+          echo "Repository: ${{ github.repository }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Action: ${{ github.event.action }}"
+          echo "═══════════════════════════════════════"
+          echo "✅ Sync step completed"
