@@ -509,6 +509,274 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* Tab Navigation */
+.tab-nav {
+  display: flex;
+  gap: 0;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 1.5rem;
+}
+
+.tab-button {
+  padding: 1rem 1.5rem;
+  border: none;
+  background: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  color: var(--text-primary);
+}
+
+.tab-button.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+/* Full Panel (for Document Import) */
+.panel-full {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Document Import */
+.document-import {
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+}
+
+.document-import .section-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: var(--text-primary);
+}
+
+.document-import .table-status {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-color);
+  border-radius: 8px;
+}
+
+.document-import .table-status h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.document-import .status-list {
+  list-style: none;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.document-import .status-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.document-import .status-list .configured .status-icon {
+  color: var(--success-color);
+}
+
+.document-import .status-list .not-configured .status-icon {
+  color: var(--error-color);
+}
+
+.document-import .status-list .not-configured .status-label {
+  color: var(--text-muted);
+}
+
+.document-import .input-section {
+  margin-bottom: 1rem;
+}
+
+.document-import .input-section label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.document-import .json-textarea {
+  width: 100%;
+  height: 300px;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 0.875rem;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.document-import .json-textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.document-import .json-textarea:disabled {
+  background: var(--bg-color);
+  color: var(--text-muted);
+}
+
+.document-import .validation-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  color: var(--error-color);
+  font-size: 0.875rem;
+}
+
+.document-import .validation-error .error-icon {
+  flex-shrink: 0;
+}
+
+.document-import .preview-info {
+  padding: 1rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.document-import .preview-info h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #166534;
+  margin-bottom: 0.75rem;
+}
+
+.document-import .preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.document-import .preview-table th {
+  text-align: left;
+  padding: 0.5rem;
+  width: 140px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.document-import .preview-table td {
+  padding: 0.5rem;
+  color: var(--text-primary);
+}
+
+.document-import .doc-type {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.document-import .doc-type-職務経歴書 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.document-import .doc-type-推薦文 {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.document-import .doc-type-キャリアプラン {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.document-import .action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.document-import .action-buttons .btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.document-import .btn-secondary {
+  background: var(--bg-color);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.document-import .btn-secondary:hover:not(:disabled) {
+  background: var(--border-color);
+}
+
+.document-import .btn-primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+.document-import .btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.document-import .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.document-import .help-section {
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+
+.document-import .help-section summary {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem 0;
+}
+
+.document-import .help-section ol {
+  margin-left: 1.5rem;
+  margin-top: 0.75rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.document-import .help-section li {
+  margin-bottom: 0.5rem;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .app-main {
@@ -521,5 +789,9 @@ body {
 
   .panel-right {
     order: 2;
+  }
+
+  .panel-full {
+    max-width: 100%;
   }
 }

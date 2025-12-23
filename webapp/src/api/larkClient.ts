@@ -5,8 +5,15 @@ import type {
   LarkBaseCreateResponse,
   LarkBaseRecord,
 } from '../types';
+import type {
+  DocumentType,
+  CareerHistoryBaseRecord,
+  RecommendationBaseRecord,
+  CareerPlanBaseRecord,
+} from '../types/documents';
 
-const LARK_BASE_URL = 'https://open.larksuite.com/open-apis';
+// 開発環境ではViteプロキシ経由、本番環境では直接アクセス
+const LARK_BASE_URL = import.meta.env.DEV ? '/lark-api' : 'https://open.larksuite.com/open-apis';
 
 interface TenantAccessTokenResponse {
   code: number;
@@ -27,11 +34,21 @@ export class LarkClient {
   private baseAppToken: string;
   private tableId: string;
 
+  // ドキュメント用テーブルID
+  private careerHistoryTableId: string;
+  private recommendationTableId: string;
+  private careerPlanTableId: string;
+
   constructor() {
     this.appId = import.meta.env.VITE_LARK_APP_ID || '';
     this.appSecret = import.meta.env.VITE_LARK_APP_SECRET || '';
     this.baseAppToken = import.meta.env.VITE_LARK_BASE_APP_TOKEN || '';
     this.tableId = import.meta.env.VITE_LARK_TABLE_ID || '';
+
+    // ドキュメント用テーブルID（環境変数から取得）
+    this.careerHistoryTableId = import.meta.env.VITE_LARK_CAREER_HISTORY_TABLE_ID || '';
+    this.recommendationTableId = import.meta.env.VITE_LARK_RECOMMENDATION_TABLE_ID || '';
+    this.careerPlanTableId = import.meta.env.VITE_LARK_CAREER_PLAN_TABLE_ID || '';
 
     this.client = axios.create({
       baseURL: LARK_BASE_URL,
@@ -187,6 +204,148 @@ export class LarkClient {
       this.baseAppToken &&
       this.tableId
     );
+  }
+
+  // ============================================
+  // ドキュメント取り込み機能
+  // ============================================
+
+  /**
+   * ドキュメントタイプからテーブルIDを取得
+   */
+  private getDocumentTableId(documentType: DocumentType): string {
+    switch (documentType) {
+      case '職務経歴書':
+        return this.careerHistoryTableId;
+      case '推薦文':
+        return this.recommendationTableId;
+      case 'キャリアプラン':
+        return this.careerPlanTableId;
+      default:
+        throw new Error(`Unknown document type: ${documentType}`);
+    }
+  }
+
+  /**
+   * ドキュメント用テーブルが設定されているかチェック
+   */
+  isDocumentTableConfigured(documentType: DocumentType): boolean {
+    const tableId = this.getDocumentTableId(documentType);
+    return !!(this.appId && this.appSecret && this.baseAppToken && tableId);
+  }
+
+  /**
+   * 全ドキュメントテーブルの設定状況を取得
+   */
+  getDocumentTablesStatus(): Record<DocumentType, { configured: boolean; tableId: string }> {
+    return {
+      '職務経歴書': {
+        configured: !!this.careerHistoryTableId,
+        tableId: this.careerHistoryTableId,
+      },
+      '推薦文': {
+        configured: !!this.recommendationTableId,
+        tableId: this.recommendationTableId,
+      },
+      'キャリアプラン': {
+        configured: !!this.careerPlanTableId,
+        tableId: this.careerPlanTableId,
+      },
+    };
+  }
+
+  /**
+   * 職務経歴書をBaseに登録
+   */
+  async createCareerHistoryRecord(
+    record: CareerHistoryBaseRecord
+  ): Promise<LarkBaseRecord> {
+    const tableId = this.getDocumentTableId('職務経歴書');
+    if (!tableId) {
+      throw new Error('職務経歴書テーブルIDが設定されていません');
+    }
+
+    const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/records`;
+    const response = await this.authRequest<LarkBaseCreateResponse>(
+      'POST',
+      url,
+      { fields: record }
+    );
+
+    if (response.code !== 0) {
+      throw new Error(`Failed to create career history record: ${response.msg}`);
+    }
+
+    return response.data.record;
+  }
+
+  /**
+   * 推薦文をBaseに登録
+   */
+  async createRecommendationRecord(
+    record: RecommendationBaseRecord
+  ): Promise<LarkBaseRecord> {
+    const tableId = this.getDocumentTableId('推薦文');
+    if (!tableId) {
+      throw new Error('推薦文テーブルIDが設定されていません');
+    }
+
+    const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/records`;
+    const response = await this.authRequest<LarkBaseCreateResponse>(
+      'POST',
+      url,
+      { fields: record }
+    );
+
+    if (response.code !== 0) {
+      throw new Error(`Failed to create recommendation record: ${response.msg}`);
+    }
+
+    return response.data.record;
+  }
+
+  /**
+   * キャリアプランをBaseに登録
+   */
+  async createCareerPlanRecord(
+    record: CareerPlanBaseRecord
+  ): Promise<LarkBaseRecord> {
+    const tableId = this.getDocumentTableId('キャリアプラン');
+    if (!tableId) {
+      throw new Error('キャリアプランテーブルIDが設定されていません');
+    }
+
+    const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/records`;
+    const response = await this.authRequest<LarkBaseCreateResponse>(
+      'POST',
+      url,
+      { fields: record }
+    );
+
+    if (response.code !== 0) {
+      throw new Error(`Failed to create career plan record: ${response.msg}`);
+    }
+
+    return response.data.record;
+  }
+
+  /**
+   * ドキュメントをBaseに登録（統合メソッド）
+   */
+  async createDocumentRecord(
+    documentType: DocumentType,
+    record: CareerHistoryBaseRecord | RecommendationBaseRecord | CareerPlanBaseRecord
+  ): Promise<LarkBaseRecord> {
+    switch (documentType) {
+      case '職務経歴書':
+        return this.createCareerHistoryRecord(record as CareerHistoryBaseRecord);
+      case '推薦文':
+        return this.createRecommendationRecord(record as RecommendationBaseRecord);
+      case 'キャリアプラン':
+        return this.createCareerPlanRecord(record as CareerPlanBaseRecord);
+      default:
+        throw new Error(`Unknown document type: ${documentType}`);
+    }
   }
 }
 
