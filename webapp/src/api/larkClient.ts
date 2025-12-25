@@ -255,7 +255,81 @@ export class LarkClient {
   }
 
   /**
+   * テーブルの既存フィールド名一覧を取得
+   */
+  private async getTableFields(tableId: string): Promise<string[]> {
+    interface FieldsResponse {
+      code: number;
+      msg: string;
+      data: {
+        items: { field_name: string }[];
+      };
+    }
+
+    const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/fields`;
+    const response = await this.authRequest<FieldsResponse>('GET', url);
+
+    if (response.code !== 0) {
+      throw new Error(`Failed to get table fields: ${response.msg}`);
+    }
+
+    return response.data.items.map((f) => f.field_name);
+  }
+
+  /**
+   * テーブルにフィールドを追加
+   */
+  private async addTableField(tableId: string, fieldName: string): Promise<void> {
+    interface AddFieldResponse {
+      code: number;
+      msg: string;
+    }
+
+    const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/fields`;
+    const response = await this.authRequest<AddFieldResponse>('POST', url, {
+      field_name: fieldName,
+      type: 1, // テキスト型
+    });
+
+    // 1254043 = フィールドが既に存在する（エラーではない）
+    if (response.code !== 0 && response.code !== 1254043) {
+      throw new Error(`Failed to add field "${fieldName}": ${response.msg}`);
+    }
+  }
+
+  /**
+   * レコードに必要なフィールドがテーブルに存在するか確認し、不足していれば追加
+   */
+  private async ensureFieldsExist(
+    tableId: string,
+    record: Record<string, unknown>
+  ): Promise<void> {
+    const existingFields = await this.getTableFields(tableId);
+    const recordFields = Object.keys(record);
+
+    // 不足フィールドを特定
+    const missingFields = recordFields.filter((f) => !existingFields.includes(f));
+
+    if (missingFields.length === 0) {
+      return;
+    }
+
+    console.log(`🔧 ${missingFields.length}件の不足フィールドを追加中...`);
+
+    // 不足フィールドを追加（順次実行で安全に）
+    for (const fieldName of missingFields) {
+      await this.addTableField(tableId, fieldName);
+      console.log(`  ✓ ${fieldName}`);
+      // APIレート制限対策
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    console.log('✅ フィールド追加完了');
+  }
+
+  /**
    * 職務経歴書をBaseに登録
+   * 6社目以降の会社フィールドが不足している場合は自動追加
    */
   async createCareerHistoryRecord(
     record: CareerHistoryBaseRecord
@@ -264,6 +338,9 @@ export class LarkClient {
     if (!tableId) {
       throw new Error('職務経歴書テーブルIDが設定されていません');
     }
+
+    // 不足フィールドを自動追加
+    await this.ensureFieldsExist(tableId, record);
 
     const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/records`;
     const response = await this.authRequest<LarkBaseCreateResponse>(

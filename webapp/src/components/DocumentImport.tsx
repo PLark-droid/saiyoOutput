@@ -134,102 +134,113 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
     <div className="document-import">
       <h2 className="section-title">Base取り込み</h2>
 
-      {/* テーブル設定状況 */}
-      <div className="table-status">
-        <h3>テーブル設定状況</h3>
-        <ul className="status-list">
-          {(Object.entries(tableStatus) as [DocumentType, { configured: boolean }][]).map(
-            ([type, { configured }]) => (
-              <li key={type} className={configured ? 'configured' : 'not-configured'}>
-                <span className="status-icon">{configured ? '✓' : '✗'}</span>
-                <span className="status-label">{type}</span>
-              </li>
-            )
-          )}
-        </ul>
-      </div>
+      <div className="section-content">
+        {/* テーブル設定状況 */}
+        <div className="table-status">
+          <h3>テーブル設定状況</h3>
+          <ul className="status-list">
+            {(Object.entries(tableStatus) as [DocumentType, { configured: boolean }][]).map(
+              ([type, { configured }]) => (
+                <li key={type} className={configured ? 'configured' : 'not-configured'}>
+                  <span className="status-icon">{configured ? '✓' : '✗'}</span>
+                  <span className="status-label">{type}</span>
+                </li>
+              )
+            )}
+          </ul>
+        </div>
 
-      {/* JSON入力エリア */}
-      <div className="input-section">
-        <label htmlFor="document-json">ドキュメントJSON</label>
-        <textarea
-          id="document-json"
-          className="json-textarea"
-          value={jsonInput}
-          onChange={(e) => setJsonInput(e.target.value)}
-          placeholder={`{
-  "document_type": "職務経歴書" | "推薦文" | "キャリアプラン",
-  "candidate_name": "...",
+        {/* JSON入力エリア */}
+        <div className="input-section">
+          <label htmlFor="document-json">ドキュメントJSON</label>
+          <textarea
+            id="document-json"
+            className="json-textarea"
+            value={jsonInput}
+            onChange={(e) => setJsonInput(e.target.value)}
+            placeholder={`AIで生成したJSONをここに貼り付けてください
+
+{
+  "document_type": "職務経歴書",
+  "candidate_name": { "value": "山田太郎" },
   "sections": [...]
 }`}
-          rows={12}
-          disabled={isLoading}
-        />
-      </div>
-
-      {/* バリデーションエラー */}
-      {validationError && (
-        <div className="validation-error">
-          <span className="error-icon">✗</span>
-          <span className="error-text">{validationError}</span>
+            rows={12}
+            disabled={isLoading}
+          />
         </div>
-      )}
 
-      {/* プレビュー */}
-      {previewData && (
-        <div className="preview-info">
-          <h3>検出結果</h3>
-          <table className="preview-table">
-            <tbody>
-              <tr>
-                <th>ドキュメントタイプ</th>
-                <td>
-                  <span className={`doc-type doc-type-${previewData.type}`}>
-                    {previewData.type}
-                  </span>
-                </td>
-              </tr>
-              <tr>
-                <th>候補者名</th>
-                <td>{previewData.candidateName}</td>
-              </tr>
-              <tr>
-                <th>フィールド数</th>
-                <td>{previewData.fieldCount}項目</td>
-              </tr>
-            </tbody>
-          </table>
+        {/* バリデーションエラー */}
+        {validationError && (
+          <div className="validation-error">
+            <span className="error-icon">✗</span>
+            <span className="error-text">{validationError}</span>
+          </div>
+        )}
+
+        {/* プレビュー */}
+        {previewData && (
+          <div className="preview-info">
+            <h3>検出結果</h3>
+            <table className="preview-table">
+              <tbody>
+                <tr>
+                  <th>ドキュメントタイプ</th>
+                  <td>
+                    <span className={`doc-type doc-type-${previewData.type}`}>
+                      {previewData.type}
+                    </span>
+                  </td>
+                </tr>
+                <tr>
+                  <th>候補者名</th>
+                  <td>{previewData.candidateName}</td>
+                </tr>
+                <tr>
+                  <th>フィールド数</th>
+                  <td>{previewData.fieldCount}項目</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* アクションボタン */}
+        <div className="action-buttons">
+          <button
+            className="btn btn-secondary"
+            onClick={handleValidate}
+            disabled={isLoading || !jsonInput.trim()}
+          >
+            バリデーション
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleImport}
+            disabled={isLoading || !detectedType}
+          >
+            {isLoading ? (
+              <>
+                <span className="spinner" />
+                取り込み中...
+              </>
+            ) : (
+              'Baseに取り込む'
+            )}
+          </button>
         </div>
-      )}
 
-      {/* アクションボタン */}
-      <div className="action-buttons">
-        <button
-          className="btn btn-secondary"
-          onClick={handleValidate}
-          disabled={isLoading || !jsonInput.trim()}
-        >
-          バリデーション
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={handleImport}
-          disabled={isLoading || !detectedType}
-        >
-          {isLoading ? '取り込み中...' : 'Baseに取り込む'}
-        </button>
-      </div>
-
-      {/* ヘルプ */}
-      <div className="help-section">
-        <details>
-          <summary>使い方</summary>
-          <ol>
-            <li>職務経歴書、推薦文、またはキャリアプランのJSONを貼り付け</li>
-            <li>「バリデーション」ボタンでJSON形式を確認</li>
-            <li>「Baseに取り込む」ボタンで対応するテーブルにレコード作成</li>
-          </ol>
-        </details>
+        {/* ヘルプ */}
+        <div className="help-section">
+          <details>
+            <summary>使い方</summary>
+            <ol>
+              <li>職務経歴書、推薦文、またはキャリアプランのJSONを貼り付け</li>
+              <li>「バリデーション」ボタンでJSON形式を確認</li>
+              <li>「Baseに取り込む」ボタンで対応するテーブルにレコード作成</li>
+            </ol>
+          </details>
+        </div>
       </div>
     </div>
   );

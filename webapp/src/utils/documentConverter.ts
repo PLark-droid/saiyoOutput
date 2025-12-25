@@ -125,50 +125,6 @@ function extractCompanyData(company: CompanyEntry): ExtractedCompanyData {
   };
 }
 
-function formatCompanyEntry(company: CompanyEntry): string {
-  const data = extractCompanyData(company);
-  const lines: string[] = [];
-
-  lines.push(`【${data.会社名}】${data.期間}（${data.雇用形態}）`);
-  lines.push(`${data.事業内容}`);
-  lines.push(`${data.資本金} / ${data.従業員数}`);
-  lines.push(`部署: ${data.部署}`);
-  lines.push('');
-  if (data.業務内容) {
-    lines.push('■業務内容');
-    lines.push(data.業務内容);
-    lines.push('');
-  }
-  if (data.主な実績) {
-    lines.push('■主な実績');
-    lines.push(data.主な実績);
-    lines.push('');
-  }
-  if (data.主な取り組み) {
-    lines.push('■主な取り組み');
-    lines.push(data.主な取り組み);
-  }
-
-  return lines.join('\n');
-}
-
-function emptyCompanyFields(): Record<string, string> {
-  return {
-    会社名: '',
-    期間: '',
-    雇用形態: '',
-    事業内容: '',
-    資本金: '',
-    売上高: '',
-    従業員数: '',
-    上場区分: '',
-    部署: '',
-    業務内容: '',
-    主な実績: '',
-    主な取り組み: '',
-  };
-}
-
 function formatSkills(items: ListItem[]): string {
   return items.map(item => `・${item.content}`).join('\n');
 }
@@ -201,16 +157,6 @@ export function convertCareerHistory(doc: CareerHistoryDocument): CareerHistoryB
 
   const companyCount = companies.length;
 
-  // Extract detailed company data (max 5)
-  const c1 = companies[0] ? extractCompanyData(companies[0]) : emptyCompanyFields();
-  const c2 = companies[1] ? extractCompanyData(companies[1]) : emptyCompanyFields();
-  const c3 = companies[2] ? extractCompanyData(companies[2]) : emptyCompanyFields();
-  const c4 = companies[3] ? extractCompanyData(companies[3]) : emptyCompanyFields();
-  const c5 = companies[4] ? extractCompanyData(companies[4]) : emptyCompanyFields();
-
-  // 6社目以降はその他にまとめる
-  const otherCompanies = companies.slice(5).map((c) => formatCompanyEntry(c)).join('\n\n---\n\n');
-
   // Get skills
   const skillsSection = doc.sections.find(s => s.section_id === 'skills');
   const skills = skillsSection && 'content' in skillsSection && 'list_items' in skillsSection.content
@@ -223,82 +169,38 @@ export function convertCareerHistory(doc: CareerHistoryDocument): CareerHistoryB
     ? formatSelfPR(selfPRSection.content.pr_points as PRPoint[])
     : '';
 
-  return {
+  // ベースレコード作成
+  const record: CareerHistoryBaseRecord = {
     候補者名: candidateName,
     最終更新日: lastUpdated,
     職務要約: summary,
-    // 会社1
-    会社名_会社1: c1.会社名,
-    期間_会社1: c1.期間,
-    雇用形態_会社1: c1.雇用形態,
-    事業内容_会社1: c1.事業内容,
-    資本金_会社1: c1.資本金,
-    売上高_会社1: c1.売上高,
-    従業員数_会社1: c1.従業員数,
-    上場区分_会社1: c1.上場区分,
-    部署_会社1: c1.部署,
-    業務内容_会社1: c1.業務内容,
-    主な実績_会社1: c1.主な実績,
-    主な取り組み_会社1: c1.主な取り組み,
-    // 会社2
-    会社名_会社2: c2.会社名,
-    期間_会社2: c2.期間,
-    雇用形態_会社2: c2.雇用形態,
-    事業内容_会社2: c2.事業内容,
-    資本金_会社2: c2.資本金,
-    売上高_会社2: c2.売上高,
-    従業員数_会社2: c2.従業員数,
-    上場区分_会社2: c2.上場区分,
-    部署_会社2: c2.部署,
-    業務内容_会社2: c2.業務内容,
-    主な実績_会社2: c2.主な実績,
-    主な取り組み_会社2: c2.主な取り組み,
-    // 会社3
-    会社名_会社3: c3.会社名,
-    期間_会社3: c3.期間,
-    雇用形態_会社3: c3.雇用形態,
-    事業内容_会社3: c3.事業内容,
-    資本金_会社3: c3.資本金,
-    売上高_会社3: c3.売上高,
-    従業員数_会社3: c3.従業員数,
-    上場区分_会社3: c3.上場区分,
-    部署_会社3: c3.部署,
-    業務内容_会社3: c3.業務内容,
-    主な実績_会社3: c3.主な実績,
-    主な取り組み_会社3: c3.主な取り組み,
-    // 会社4
-    会社名_会社4: c4.会社名,
-    期間_会社4: c4.期間,
-    雇用形態_会社4: c4.雇用形態,
-    事業内容_会社4: c4.事業内容,
-    資本金_会社4: c4.資本金,
-    売上高_会社4: c4.売上高,
-    従業員数_会社4: c4.従業員数,
-    上場区分_会社4: c4.上場区分,
-    部署_会社4: c4.部署,
-    業務内容_会社4: c4.業務内容,
-    主な実績_会社4: c4.主な実績,
-    主な取り組み_会社4: c4.主な取り組み,
-    // 会社5
-    会社名_会社5: c5.会社名,
-    期間_会社5: c5.期間,
-    雇用形態_会社5: c5.雇用形態,
-    事業内容_会社5: c5.事業内容,
-    資本金_会社5: c5.資本金,
-    売上高_会社5: c5.売上高,
-    従業員数_会社5: c5.従業員数,
-    上場区分_会社5: c5.上場区分,
-    部署_会社5: c5.部署,
-    業務内容_会社5: c5.業務内容,
-    主な実績_会社5: c5.主な実績,
-    主な取り組み_会社5: c5.主な取り組み,
-    // その他
-    職務経歴_その他: otherCompanies,
     会社数: companyCount,
     '活かせる経験・知識・技術': skills,
     '自己PR': selfPR,
     元データJSON: JSON.stringify(doc, null, 2),
   };
+
+  // 全ての会社データを動的に追加（会社数に制限なし）
+  for (let i = 0; i < companies.length; i++) {
+    const companyNum = i + 1;
+    const companyData = extractCompanyData(companies[i]);
+
+    // 各会社のフィールドを追加
+    record[`会社名_会社${companyNum}`] = companyData.会社名;
+    record[`期間_会社${companyNum}`] = companyData.期間;
+    record[`雇用形態_会社${companyNum}`] = companyData.雇用形態;
+    record[`事業内容_会社${companyNum}`] = companyData.事業内容;
+    record[`資本金_会社${companyNum}`] = companyData.資本金;
+    record[`売上高_会社${companyNum}`] = companyData.売上高;
+    record[`従業員数_会社${companyNum}`] = companyData.従業員数;
+    record[`上場区分_会社${companyNum}`] = companyData.上場区分;
+    record[`部署_会社${companyNum}`] = companyData.部署;
+    record[`業務内容_会社${companyNum}`] = companyData.業務内容;
+    record[`主な実績_会社${companyNum}`] = companyData.主な実績;
+    record[`主な取り組み_会社${companyNum}`] = companyData.主な取り組み;
+  }
+
+  return record;
 }
 
 // ============================================

@@ -285,81 +285,36 @@ export interface CompanyDetailRecord {
   主な取り組み: string;
 }
 
+// 会社フィールドのキー名（動的生成用）
+export const COMPANY_FIELD_NAMES = [
+  '会社名',
+  '期間',
+  '雇用形態',
+  '事業内容',
+  '資本金',
+  '売上高',
+  '従業員数',
+  '上場区分',
+  '部署',
+  '業務内容',
+  '主な実績',
+  '主な取り組み',
+] as const;
+
+export type CompanyFieldName = typeof COMPANY_FIELD_NAMES[number];
+
+// 動的な会社フィールドを含むレコード型
+// 例: 会社名_会社1, 期間_会社1, ..., 会社名_会社N, 期間_会社N
 export interface CareerHistoryBaseRecord {
   候補者名: string;
   最終更新日: string;
   職務要約: string;
-  // 会社1
-  会社名_会社1: string;
-  期間_会社1: string;
-  雇用形態_会社1: string;
-  事業内容_会社1: string;
-  資本金_会社1: string;
-  売上高_会社1: string;
-  従業員数_会社1: string;
-  上場区分_会社1: string;
-  部署_会社1: string;
-  業務内容_会社1: string;
-  主な実績_会社1: string;
-  主な取り組み_会社1: string;
-  // 会社2
-  会社名_会社2: string;
-  期間_会社2: string;
-  雇用形態_会社2: string;
-  事業内容_会社2: string;
-  資本金_会社2: string;
-  売上高_会社2: string;
-  従業員数_会社2: string;
-  上場区分_会社2: string;
-  部署_会社2: string;
-  業務内容_会社2: string;
-  主な実績_会社2: string;
-  主な取り組み_会社2: string;
-  // 会社3
-  会社名_会社3: string;
-  期間_会社3: string;
-  雇用形態_会社3: string;
-  事業内容_会社3: string;
-  資本金_会社3: string;
-  売上高_会社3: string;
-  従業員数_会社3: string;
-  上場区分_会社3: string;
-  部署_会社3: string;
-  業務内容_会社3: string;
-  主な実績_会社3: string;
-  主な取り組み_会社3: string;
-  // 会社4
-  会社名_会社4: string;
-  期間_会社4: string;
-  雇用形態_会社4: string;
-  事業内容_会社4: string;
-  資本金_会社4: string;
-  売上高_会社4: string;
-  従業員数_会社4: string;
-  上場区分_会社4: string;
-  部署_会社4: string;
-  業務内容_会社4: string;
-  主な実績_会社4: string;
-  主な取り組み_会社4: string;
-  // 会社5
-  会社名_会社5: string;
-  期間_会社5: string;
-  雇用形態_会社5: string;
-  事業内容_会社5: string;
-  資本金_会社5: string;
-  売上高_会社5: string;
-  従業員数_会社5: string;
-  上場区分_会社5: string;
-  部署_会社5: string;
-  業務内容_会社5: string;
-  主な実績_会社5: string;
-  主な取り組み_会社5: string;
-  // その他
-  職務経歴_その他: string;
   会社数: number;
-  活かせる経験・知識・技術: string;
-  自己PR: string;
+  '活かせる経験・知識・技術': string;
+  '自己PR': string;
   元データJSON: string;
+  // 動的な会社フィールド（会社名_会社1, 期間_会社1, ... 会社名_会社N, 期間_会社N）
+  [key: string]: string | number;
 }
 
 export interface RecommendationBaseRecord {
