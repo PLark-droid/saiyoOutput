@@ -103,7 +103,13 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
 
       const { type, record } = convertDocument(validated);
 
-      await larkClient.createDocumentRecord(type, record);
+      // デバッグログ
+      console.log('📋 変換結果:', { type, record });
+      console.log('📤 API送信開始...');
+
+      const result = await larkClient.createDocumentRecord(type, record);
+
+      console.log('✅ API成功:', result);
 
       const candidateName =
         type === '職務経歴書'
@@ -119,6 +125,7 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
       setDetectedType(null);
       setPreviewData(null);
     } catch (e) {
+      console.error('❌ インポートエラー:', e);
       const errorMessage =
         e instanceof Error ? e.message : 'Base取り込みに失敗しました';
       onError?.(errorMessage);

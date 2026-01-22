@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/lark-api/:path*",
+      "destination": "https://open.larksuite.com/open-apis/:path*"
+    }
+  ]
+}

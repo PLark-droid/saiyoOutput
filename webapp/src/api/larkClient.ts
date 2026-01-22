@@ -12,8 +12,9 @@ import type {
   CareerPlanBaseRecord,
 } from '../types/documents';
 
-// 開発環境ではViteプロキシ経由、本番環境では直接アクセス
-const LARK_BASE_URL = import.meta.env.DEV ? '/lark-api' : 'https://open.larksuite.com/open-apis';
+// 開発環境ではViteプロキシ経由、本番環境ではVercelリライト経由
+// どちらも /lark-api を使用（CORSを回避）
+const LARK_BASE_URL = '/lark-api';
 
 interface TenantAccessTokenResponse {
   code: number;

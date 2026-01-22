@@ -27,3 +27,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.vercel
+
+# Slack scripts with tokens
+webapp/scripts/getSlackMembers*.ts
+webapp/scripts/getChannelMembers.ts

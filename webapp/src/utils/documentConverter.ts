@@ -13,10 +13,6 @@ import type {
   CompanyInfo,
   DepartmentDetails,
   RecommendationReason,
-  ConditionRow,
-  PlanSection,
-  PlanGoal,
-  Potential,
   CandidateDocument,
   DocumentType,
   ListItem,
@@ -66,6 +62,17 @@ interface ExtractedCompanyData {
   主な取り組み: string;
 }
 
+interface TopicItem {
+  id: string;
+  title: string;
+  description: string;
+}
+
+interface TopicsContent {
+  heading?: string;
+  topics: TopicItem[];
+}
+
 function extractCompanyData(company: CompanyEntry): ExtractedCompanyData {
   let companyName = '';
   let period = '';
@@ -79,10 +86,12 @@ function extractCompanyData(company: CompanyEntry): ExtractedCompanyData {
   let duties: string[] = [];
   let achievements: string[] = [];
   let initiatives: string[] = [];
+  let topics: TopicItem[] = [];
 
   for (const row of company.table.rows) {
     for (const cell of row.cells) {
-      if (cell.type === 'period' && typeof cell.content === 'string') {
+      // 期間は最初の非空値を採用（topics行の空文字で上書きされないように）
+      if (cell.type === 'period' && typeof cell.content === 'string' && cell.content && !period) {
         period = cell.content;
       }
       if (cell.type === 'company_info' && typeof cell.content === 'object') {
@@ -99,14 +108,29 @@ function extractCompanyData(company: CompanyEntry): ExtractedCompanyData {
       }
       if (cell.type === 'details' && typeof cell.content === 'object') {
         const details = cell.content as DepartmentDetails;
-        department = details.department;
-        duties = details.業務内容?.list_items?.map(item => item.content) || [];
-        achievements = details.主な実績?.list_items?.map(item =>
-          item.metrics ? `${item.content}（${item.metrics}）` : item.content
-        ) || [];
-        initiatives = details.主な取り組み?.list_items?.map(item => item.content) || [];
+        // department_and_duties 行の場合
+        if (details.department) {
+          department = details.department;
+          duties = details.業務内容?.list_items?.map(item => item.content) || [];
+          achievements = details.主な実績?.list_items?.map(item =>
+            item.metrics ? `${item.content}（${item.metrics}）` : item.content
+          ) || [];
+          initiatives = details.主な取り組み?.list_items?.map(item => item.content) || [];
+        }
+        // topics 行の場合
+        const topicsContent = cell.content as unknown as TopicsContent;
+        if (topicsContent.topics && Array.isArray(topicsContent.topics)) {
+          topics = topicsContent.topics;
+        }
       }
     }
+  }
+
+  // 主な実績をフォーマット（トピックスがあれば追記）
+  let formattedAchievements = achievements.map(a => `・${a}`).join('\n');
+  if (topics.length > 0) {
+    const formattedTopics = topics.map(t => `${t.title}\n${t.description}`).join('\n\n');
+    formattedAchievements += (formattedAchievements ? '\n\n' : '') + '【トピックス】\n' + formattedTopics;
   }
 
   return {
@@ -120,7 +144,7 @@ function extractCompanyData(company: CompanyEntry): ExtractedCompanyData {
     上場区分: listing,
     部署: department,
     業務内容: duties.map(d => `・${d}`).join('\n'),
-    主な実績: achievements.map(a => `・${a}`).join('\n'),
+    主な実績: formattedAchievements,
     主な取り組み: initiatives.map(i => `・${i}`).join('\n'),
   };
 }
@@ -207,21 +231,51 @@ export function convertCareerHistory(doc: CareerHistoryDocument): CareerHistoryB
 // 推薦文変換
 // ============================================
 
+interface RecommendationReasonContent {
+  introduction: string;
+  reasons: RecommendationReason[];
+  aspiration_and_potential?: {
+    heading: string;
+    content: string;
+  };
+  overall_assessment?: {
+    heading: string;
+    content: string;
+  };
+}
+
+interface ConditionCell {
+  content: string;
+  type: 'label' | 'value';
+}
+
+interface ConditionTableRow {
+  cells: ConditionCell[];
+}
+
 function formatRecommendationReasons(reasons: RecommendationReason[]): string {
   const lines: string[] = [];
 
   for (const reason of reasons) {
     lines.push(`【${reason.heading}】`);
-    lines.push(reason.content);
+    // description または content をサポート
+    const text = reason.description || reason.content || '';
+    lines.push(text);
     lines.push('');
   }
 
   return lines.join('\n');
 }
 
-function getConditionValue(rows: ConditionRow[], item: string): string {
-  const row = rows.find(r => r.item === item);
-  return row ? row.detail : '';
+function getConditionValueFromTable(rows: ConditionTableRow[], label: string): string {
+  for (const row of rows) {
+    const labelCell = row.cells.find(c => c.type === 'label');
+    const valueCell = row.cells.find(c => c.type === 'value');
+    if (labelCell && valueCell && labelCell.content === label) {
+      return valueCell.content;
+    }
+  }
+  return '';
 }
 
 export function convertRecommendation(doc: RecommendationDocument): RecommendationBaseRecord {
@@ -237,29 +291,42 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
     ? overviewSection.content.text
     : '';
 
-  const reasonSection = findSection('reason_for_job_change');
+  // reason_for_change または reason_for_job_change をサポート
+  const reasonSection = findSection('reason_for_change') || findSection('reason_for_job_change');
   const reason = reasonSection && 'content' in reasonSection && 'text' in reasonSection.content
     ? reasonSection.content.text
     : '';
 
-  const summarySection = findSection('summary');
-  const summary = summarySection && 'content' in summarySection && 'text' in summarySection.content
-    ? summarySection.content.text
-    : '';
-
-  // Recommendation reasons
+  // Recommendation reasons (with aspiration_and_potential and overall_assessment)
   const recReasonSection = findSection('recommendation_reason');
   let recommendationReasons = '';
-  if (recReasonSection && 'content' in recReasonSection && 'reasons' in recReasonSection.content) {
-    const content = recReasonSection.content as { introduction: string; reasons: RecommendationReason[] };
-    recommendationReasons = content.introduction + '\n\n' + formatRecommendationReasons(content.reasons);
+  let aspirationAndPotential = '';
+  let overallAssessment = '';
+
+  if (recReasonSection && 'content' in recReasonSection) {
+    const content = recReasonSection.content as RecommendationReasonContent;
+
+    // 推薦理由本文
+    if (content.introduction && content.reasons) {
+      recommendationReasons = content.introduction + '\n\n' + formatRecommendationReasons(content.reasons);
+    }
+
+    // 志向性と将来性
+    if (content.aspiration_and_potential) {
+      aspirationAndPotential = `【${content.aspiration_and_potential.heading}】\n${content.aspiration_and_potential.content}`;
+    }
+
+    // 総評
+    if (content.overall_assessment) {
+      overallAssessment = `【${content.overall_assessment.heading}】\n${content.overall_assessment.content}`;
+    }
   }
 
-  // Conditions
+  // Conditions (新しいテーブル形式に対応)
   const conditionsSection = findSection('conditions');
-  let conditionRows: ConditionRow[] = [];
+  let conditionRows: ConditionTableRow[] = [];
   if (conditionsSection && 'content' in conditionsSection && 'table' in conditionsSection.content) {
-    const content = conditionsSection.content as { table: { rows: ConditionRow[] } };
+    const content = conditionsSection.content as unknown as { table: { rows: ConditionTableRow[] } };
     conditionRows = content.table.rows;
   }
 
@@ -269,15 +336,14 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
     候補者概要: overview,
     転職理由: reason,
     推薦理由: recommendationReasons,
-    まとめ: summary,
-    希望年収: getConditionValue(conditionRows, '希望年収'),
-    入社希望時期: getConditionValue(conditionRows, '入社希望時期'),
-    希望勤務地: getConditionValue(conditionRows, '勤務地'),
-    希望休日: getConditionValue(conditionRows, '休日'),
-    希望働き方: getConditionValue(conditionRows, '働き方'),
-    希望職種: getConditionValue(conditionRows, '職種'),
-    その他条件: getConditionValue(conditionRows, 'その他'),
-    推薦者: doc.footer.recommender,
+    志向性と将来性: aspirationAndPotential,
+    総評: overallAssessment,
+    希望年収: getConditionValueFromTable(conditionRows, '希望年収'),
+    転職時期: getConditionValueFromTable(conditionRows, '転職時期'),
+    希望勤務地: getConditionValueFromTable(conditionRows, '勤務地'),
+    希望休日: getConditionValueFromTable(conditionRows, '休日'),
+    希望職種: getConditionValueFromTable(conditionRows, '職種'),
+    その他条件: getConditionValueFromTable(conditionRows, 'その他'),
     元データJSON: JSON.stringify(doc, null, 2),
   };
 }
@@ -286,70 +352,122 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
 // キャリアプラン変換
 // ============================================
 
-function formatPlanGoals(goals: PlanGoal[]): string {
+interface CareerPlanSectionContent {
+  phase?: string;
+  goal?: string;
+  recommended_positions?: {
+    heading: string;
+    list_items: { id: string; content: string }[];
+  };
+  target_income?: {
+    heading: string;
+    content: string;
+  };
+  skills_to_acquire?: {
+    heading: string;
+    list_items: { id: string; content: string }[];
+  };
+  career_strategy?: {
+    heading: string;
+    content: string;
+  };
+  text?: string;
+  introduction?: string;
+  potentials?: { id: string; heading: string; content: string }[];
+  summary?: { heading: string; content: string };
+  roadmap?: {
+    heading: string;
+    table: { rows: { cells: { content: string; type: string }[] }[] };
+  };
+  final_message?: string;
+}
+
+function formatCareerPlanSection(content: CareerPlanSectionContent): string {
   const lines: string[] = [];
 
-  for (const goal of goals) {
-    lines.push(`【${goal.heading}】`);
-    lines.push(goal.content);
-
-    if (goal.targets && goal.targets.length > 0) {
-      lines.push('');
-      lines.push('目標:');
-      goal.targets.forEach(t => lines.push(`・${t}`));
-    }
-
-    if (goal.initiatives && goal.initiatives.length > 0) {
-      lines.push('');
-      lines.push('施策:');
-      goal.initiatives.forEach(i => lines.push(`・${i}`));
-    }
-
-    if (goal.skills && goal.skills.length > 0) {
-      lines.push('');
-      lines.push('習得スキル:');
-      goal.skills.forEach(s => lines.push(`・${s}`));
-    }
-
-    if (goal.roles && goal.roles.length > 0) {
-      lines.push('');
-      lines.push('担う役割:');
-      goal.roles.forEach(r => lines.push(`・${r}`));
-    }
-
-    if (goal.activities && goal.activities.length > 0) {
-      lines.push('');
-      lines.push('活動:');
-      goal.activities.forEach(a => lines.push(`・${a}`));
-    }
-
-    if (goal.conclusion) {
-      lines.push('');
-      lines.push(goal.conclusion);
-    }
-
+  if (content.phase && content.goal) {
+    lines.push(`【${content.phase}】`);
+    lines.push(`目標: ${content.goal}`);
     lines.push('');
+  }
+
+  if (content.recommended_positions) {
+    lines.push(`${content.recommended_positions.heading}:`);
+    content.recommended_positions.list_items.forEach(item => {
+      lines.push(`・${item.content}`);
+    });
+    lines.push('');
+  }
+
+  if (content.target_income) {
+    lines.push(`${content.target_income.heading}: ${content.target_income.content}`);
+    lines.push('');
+  }
+
+  if (content.skills_to_acquire) {
+    lines.push(`${content.skills_to_acquire.heading}:`);
+    content.skills_to_acquire.list_items.forEach(item => {
+      lines.push(`・${item.content}`);
+    });
+    lines.push('');
+  }
+
+  if (content.career_strategy) {
+    lines.push(`${content.career_strategy.heading}:`);
+    lines.push(content.career_strategy.content);
   }
 
   return lines.join('\n');
 }
 
-function formatPlanSection(section: PlanSection): string {
+function formatPotentialsSection(content: CareerPlanSectionContent): string {
   const lines: string[] = [];
-  lines.push(section.content.introduction);
-  lines.push('');
-  lines.push(formatPlanGoals(section.content.goals));
-  lines.push(section.content.conclusion);
+
+  if (content.introduction) {
+    lines.push(content.introduction);
+    lines.push('');
+  }
+
+  if (content.potentials) {
+    for (const potential of content.potentials) {
+      lines.push(`【${potential.heading}】`);
+      lines.push(potential.content);
+      lines.push('');
+    }
+  }
+
+  if (content.summary) {
+    lines.push(`【${content.summary.heading}】`);
+    lines.push(content.summary.content);
+  }
+
   return lines.join('\n');
 }
 
-function formatPotentials(potentials: Potential[]): string {
+function formatConclusionSection(content: CareerPlanSectionContent): string {
   const lines: string[] = [];
 
-  for (const potential of potentials) {
-    lines.push(`【${potential.heading}】`);
-    lines.push(potential.content);
+  if (content.text) {
+    lines.push(content.text);
     lines.push('');
+  }
+
+  if (content.final_message) {
+    lines.push(content.final_message);
+  }
+
+  return lines.join('\n');
+}
+
+function formatRoadmap(content: CareerPlanSectionContent): string {
+  if (!content.roadmap) return '';
+
+  const lines: string[] = [];
+  lines.push(`【${content.roadmap.heading}】`);
+
+  for (const row of content.roadmap.table.rows) {
+    const cells = row.cells.map(c => c.content).join(' | ');
+    lines.push(cells);
   }
 
   return lines.join('\n');
@@ -362,46 +480,57 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
   // Get sections by ID
   const findSection = (id: string) => doc.sections.find(s => s.section_id === id);
 
-  // Vision
-  const visionSection = findSection('career_vision');
-  const vision = visionSection && 'content' in visionSection && 'text' in visionSection.content
-    ? visionSection.content.text
+  // はじめに (introduction)
+  const introSection = findSection('introduction');
+  const introduction = introSection && 'content' in introSection && 'text' in introSection.content
+    ? introSection.content.text
     : '';
 
-  // Plans
-  const shortTermSection = findSection('short_term_plan') as PlanSection | undefined;
-  const shortTerm = shortTermSection ? formatPlanSection(shortTermSection) : '';
+  // 短期計画 (short_term)
+  const shortTermSection = findSection('short_term');
+  const shortTerm = shortTermSection && 'content' in shortTermSection
+    ? formatCareerPlanSection(shortTermSection.content as CareerPlanSectionContent)
+    : '';
 
-  const midTermSection = findSection('mid_term_plan') as PlanSection | undefined;
-  const midTerm = midTermSection ? formatPlanSection(midTermSection) : '';
+  // 中期計画 (mid_term)
+  const midTermSection = findSection('mid_term');
+  const midTerm = midTermSection && 'content' in midTermSection
+    ? formatCareerPlanSection(midTermSection.content as CareerPlanSectionContent)
+    : '';
 
-  const longTermSection = findSection('long_term_plan') as PlanSection | undefined;
-  const longTerm = longTermSection ? formatPlanSection(longTermSection) : '';
+  // 長期計画 (long_term)
+  const longTermSection = findSection('long_term');
+  const longTerm = longTermSection && 'content' in longTermSection
+    ? formatCareerPlanSection(longTermSection.content as CareerPlanSectionContent)
+    : '';
 
-  // Potentials
-  const potentialSection = findSection('potential');
-  let potentials = '';
-  if (potentialSection && 'content' in potentialSection && 'potentials' in potentialSection.content) {
-    const content = potentialSection.content as { introduction: string; potentials: Potential[] };
-    potentials = content.introduction + '\n\n' + formatPotentials(content.potentials);
-  }
+  // ポテンシャル (hidden_potential)
+  const potentialSection = findSection('hidden_potential');
+  const potentials = potentialSection && 'content' in potentialSection
+    ? formatPotentialsSection(potentialSection.content as CareerPlanSectionContent)
+    : '';
 
-  // Summary
-  const summarySection = findSection('summary');
-  const summary = summarySection && 'content' in summarySection && 'text' in summarySection.content
-    ? summarySection.content.text
+  // まとめ (conclusion)
+  const conclusionSection = findSection('conclusion');
+  const conclusion = conclusionSection && 'content' in conclusionSection
+    ? formatConclusionSection(conclusionSection.content as CareerPlanSectionContent)
+    : '';
+
+  // キャリアロードマップ
+  const roadmap = conclusionSection && 'content' in conclusionSection
+    ? formatRoadmap(conclusionSection.content as CareerPlanSectionContent)
     : '';
 
   return {
     候補者名: candidateName,
     作成日: creationDate,
-    キャリアビジョン: vision,
+    はじめに: introduction,
     短期計画: shortTerm,
     中期計画: midTerm,
     長期計画: longTerm,
     ポテンシャル: potentials,
-    まとめ: summary,
-    作成者: doc.footer.author,
+    まとめ: conclusion,
+    キャリアロードマップ: roadmap,
     元データJSON: JSON.stringify(doc, null, 2),
   };
 }

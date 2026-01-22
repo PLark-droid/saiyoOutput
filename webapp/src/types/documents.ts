@@ -169,7 +169,9 @@ export interface RecommendationReasonSection {
 export interface RecommendationReason {
   id: string;
   heading: string;
-  content: string;
+  heading_level?: string;
+  content?: string;
+  description?: string; // 新しいJSON形式ではdescriptionを使用
 }
 
 export interface ConditionsSection {
@@ -323,28 +325,27 @@ export interface RecommendationBaseRecord {
   候補者概要: string;
   転職理由: string;
   推薦理由: string;
-  まとめ: string;
+  志向性と将来性: string;
+  総評: string;
   希望年収: string;
-  入社希望時期: string;
+  転職時期: string;
   希望勤務地: string;
   希望休日: string;
-  希望働き方: string;
   希望職種: string;
   その他条件: string;
-  推薦者: string;
   元データJSON: string;
 }
 
 export interface CareerPlanBaseRecord {
   候補者名: string;
   作成日: string;
-  キャリアビジョン: string;
+  はじめに: string;
   短期計画: string;
   中期計画: string;
   長期計画: string;
   ポテンシャル: string;
   まとめ: string;
-  作成者: string;
+  キャリアロードマップ: string;
   元データJSON: string;
 }
 
