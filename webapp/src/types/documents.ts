@@ -11,10 +11,13 @@
 
 export type DocumentType = '職務経歴書' | '推薦文' | 'キャリアプラン';
 
+export type CandidateName = string | { value: string; display?: string; format?: string };
+
 export interface BaseDocument {
   document_type: DocumentType;
-  candidate_name: string;
+  candidate_name: CandidateName;
   creation_date?: string;
+  created_date?: string;
 }
 
 // ============================================
@@ -133,12 +136,15 @@ export interface PRPoint {
 
 export interface RecommendationDocument {
   document_type: '推薦文';
-  candidate_name: string;
-  creation_date: string;
+  candidate_name: CandidateName;
+  creation_date?: string;
+  created_date?: string;
   sections: RecommendationSection[];
-  footer: {
-    recommender: string;
-    creation_date: string;
+  footer?: {
+    recommender?: string;
+    creation_date?: string;
+    text?: string;
+    alignment?: string;
   };
 }
 
@@ -148,16 +154,17 @@ export type RecommendationSection =
   | ConditionsSection;
 
 export interface TextSection {
-  section_id: 'candidate_overview' | 'reason_for_job_change' | 'summary';
+  section_id: 'candidate_overview' | 'reason_for_job_change' | 'reason_for_change' | 'candidate_aspiration' | 'overall_assessment' | 'summary';
   heading: string;
   heading_level: string;
   content: {
     text: string;
+    closing?: string;
   };
 }
 
 export interface RecommendationReasonSection {
-  section_id: 'recommendation_reason';
+  section_id: 'recommendation_reason' | 'recommendation_reasons';
   heading: string;
   heading_level: string;
   content: {
@@ -179,9 +186,10 @@ export interface ConditionsSection {
   heading: string;
   heading_level: string;
   content: {
-    table: {
+    table?: {
       rows: ConditionRow[];
     };
+    list_items?: ConditionListItem[];
   };
 }
 
@@ -190,18 +198,25 @@ export interface ConditionRow {
   detail: string;
 }
 
+export interface ConditionListItem {
+  id: string;
+  label: string;
+  content: string;
+}
+
 // ============================================
 // キャリアプラン (CareerPlan)
 // ============================================
 
 export interface CareerPlanDocument {
   document_type: 'キャリアプラン';
-  candidate_name: string;
-  creation_date: string;
+  candidate_name: CandidateName;
+  creation_date?: string;
+  created_date?: string;
   sections: CareerPlanSection[];
-  footer: {
-    author: string;
-    creation_date: string;
+  footer?: {
+    author?: string;
+    creation_date?: string;
   };
 }
 
@@ -212,22 +227,47 @@ export type CareerPlanSection =
   | CareerPlanSummarySection;
 
 export interface CareerVisionSection {
-  section_id: 'career_vision';
+  section_id: 'career_vision' | 'introduction';
   heading: string;
   heading_level: string;
   content: {
-    text: string;
+    text?: string;
   };
 }
 
 export interface PlanSection {
-  section_id: 'short_term_plan' | 'mid_term_plan' | 'long_term_plan';
+  section_id:
+    | 'short_term_plan'
+    | 'mid_term_plan'
+    | 'long_term_plan'
+    | 'short_term'
+    | 'mid_term'
+    | 'long_term';
   heading: string;
   heading_level: string;
   content: {
-    introduction: string;
-    goals: PlanGoal[];
-    conclusion: string;
+    introduction?: string;
+    text?: string;
+    phase?: string;
+    goal?: string;
+    goals?: PlanGoal[];
+    recommended_positions?: {
+      heading: string;
+      list_items: ListItem[];
+    };
+    target_income?: {
+      heading: string;
+      content: string;
+    };
+    skills_to_acquire?: {
+      heading: string;
+      list_items: ListItem[];
+    };
+    career_strategy?: {
+      heading: string;
+      content: string;
+    };
+    conclusion?: string;
   };
 }
 
@@ -244,12 +284,17 @@ export interface PlanGoal {
 }
 
 export interface PotentialSection {
-  section_id: 'potential';
+  section_id: 'potential' | 'hidden_potential';
   heading: string;
   heading_level: string;
   content: {
-    introduction: string;
-    potentials: Potential[];
+    introduction?: string;
+    text?: string;
+    potentials?: Potential[];
+    summary?: {
+      heading: string;
+      content: string;
+    };
   };
 }
 
@@ -260,11 +305,23 @@ export interface Potential {
 }
 
 export interface CareerPlanSummarySection {
-  section_id: 'summary';
+  section_id: 'summary' | 'conclusion';
   heading: string;
   heading_level: string;
   content: {
-    text: string;
+    text?: string;
+    final_message?: string;
+    roadmap?: {
+      heading: string;
+      table?: {
+        rows?: {
+          cells?: {
+            content: string;
+            type: string;
+          }[];
+        }[];
+      };
+    };
   };
 }
 

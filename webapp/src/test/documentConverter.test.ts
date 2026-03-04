@@ -248,6 +248,95 @@ const sampleCareerPlan: CareerPlanDocument = {
   },
 };
 
+const sampleCareerPlanNewFormat: CareerPlanDocument = {
+  document_type: 'キャリアプラン',
+  candidate_name: {
+    value: '田中太郎',
+    display: '田中 太郎',
+  },
+  created_date: '2026年3月3日',
+  sections: [
+    {
+      section_id: 'career_vision',
+      heading: '■キャリアビジョン',
+      heading_level: 'heading1',
+      content: { text: '事業成長を支えるPMになりたい。' },
+    },
+    {
+      section_id: 'short_term',
+      heading: '■短期計画',
+      heading_level: 'heading1',
+      content: {
+        phase: '短期',
+        goal: 'PM補佐として案件推進力を高める',
+        recommended_positions: {
+          heading: '推奨ポジション',
+          list_items: [
+            { id: 'position_1', content: 'プロジェクトリーダー' },
+          ],
+        },
+      },
+    },
+    {
+      section_id: 'mid_term',
+      heading: '■中期計画',
+      heading_level: 'heading1',
+      content: {
+        phase: '中期',
+        goal: '複数案件の統括を担う',
+        skills_to_acquire: {
+          heading: '習得スキル',
+          list_items: [
+            { id: 'skill_1', content: '予実管理' },
+          ],
+        },
+      },
+    },
+    {
+      section_id: 'long_term',
+      heading: '■長期計画',
+      heading_level: 'heading1',
+      content: {
+        phase: '長期',
+        goal: '事業責任者として組織を牽引する',
+        career_strategy: {
+          heading: 'キャリア戦略',
+          content: '新規事業と既存事業の両方を経験する。',
+        },
+      },
+    },
+    {
+      section_id: 'hidden_potential',
+      heading: '■ポテンシャル',
+      heading_level: 'heading1',
+      content: {
+        introduction: '面談から見える強みです。',
+      },
+    },
+    {
+      section_id: 'conclusion',
+      heading: '■まとめ',
+      heading_level: 'heading1',
+      content: {
+        text: '段階的な成長が期待できます。',
+        roadmap: {
+          heading: 'キャリアロードマップ',
+          table: {
+            rows: [
+              {
+                cells: [
+                  { type: 'term', content: '1年後' },
+                  { type: 'goal', content: 'PLとして案件推進' },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    },
+  ],
+};
+
 describe('detectDocumentType', () => {
   it('職務経歴書を正しく検出する', () => {
     expect(detectDocumentType(sampleCareerHistory)).toBe('職務経歴書');
@@ -330,6 +419,19 @@ describe('convertCareerPlan', () => {
     expect(result.長期計画).toBeDefined();
     expect(result.ポテンシャル).toBeDefined();
     expect(result.まとめ).toBeDefined();
+  });
+
+  it('新形式のキャリアプランでもエラーなく変換する', () => {
+    const result = convertCareerPlan(sampleCareerPlanNewFormat);
+
+    expect(result.候補者名).toBe('田中 太郎');
+    expect(result.作成日).toBe('2026年3月3日');
+    expect(result.はじめに).toBe('事業成長を支えるPMになりたい。');
+    expect(result.短期計画).toContain('プロジェクトリーダー');
+    expect(result.中期計画).toContain('予実管理');
+    expect(result.長期計画).toContain('新規事業と既存事業の両方を経験する。');
+    expect(result.ポテンシャル).toContain('面談から見える強みです。');
+    expect(result.キャリアロードマップ).toContain('1年後 | PLとして案件推進');
   });
 });
 

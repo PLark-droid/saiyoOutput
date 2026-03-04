@@ -5,7 +5,13 @@ import {
   validateDocument,
   convertDocument,
 } from '../utils/documentConverter';
-import type { DocumentType } from '../types/documents';
+import type { DocumentType, CandidateName } from '../types/documents';
+
+function resolveName(name: CandidateName | undefined): string {
+  if (!name) return '';
+  if (typeof name === 'string') return name;
+  return name.display || name.value || '';
+}
 
 interface DocumentImportProps {
   onSuccess?: (message: string) => void;
@@ -54,10 +60,7 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
       setDetectedType(docType);
 
       // プレビュー情報を設定
-      const candidateName =
-        docType === '職務経歴書'
-          ? (parsed as any).candidate_name?.value || ''
-          : (parsed as any).candidate_name || '';
+      const candidateName = resolveName((parsed as any).candidate_name);
 
       const converted = convertDocument(validated);
       const fieldCount = Object.keys(converted.record).length;
@@ -111,10 +114,7 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
 
       console.log('✅ API成功:', result);
 
-      const candidateName =
-        type === '職務経歴書'
-          ? (parsed as any).candidate_name?.value || ''
-          : (parsed as any).candidate_name || '';
+      const candidateName = resolveName((parsed as any).candidate_name);
 
       onSuccess?.(
         `✓ ${type}をBaseに取り込みました（候補者: ${candidateName}）`
