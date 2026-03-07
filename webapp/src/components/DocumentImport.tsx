@@ -5,6 +5,7 @@ import {
   validateDocument,
   convertDocument,
 } from '../utils/documentConverter';
+import { safeJsonParse } from '../utils/jsonSanitizer';
 import type { DocumentType, CandidateName } from '../types/documents';
 
 function resolveName(name: CandidateName | undefined): string {
@@ -41,7 +42,7 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
     }
 
     try {
-      const parsed = JSON.parse(jsonInput);
+      const parsed = safeJsonParse(jsonInput);
       const docType = detectDocumentType(parsed);
 
       if (!docType) {
@@ -97,7 +98,7 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
     setIsLoading(true);
 
     try {
-      const parsed = JSON.parse(jsonInput);
+      const parsed = safeJsonParse(jsonInput);
       const validated = validateDocument(parsed);
 
       if (!validated) {

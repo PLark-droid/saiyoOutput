@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { AIGeneratedInput, Candidate } from '../types';
+import { safeJsonParse } from '../utils/jsonSanitizer';
 
 interface JsonInputProps {
   onParse: (data: AIGeneratedInput) => void;
@@ -39,7 +40,7 @@ export function JsonInput({ onParse, onError }: JsonInputProps) {
       }
 
       try {
-        const parsed = JSON.parse(text) as AIGeneratedInput;
+        const parsed = safeJsonParse<AIGeneratedInput>(text);
 
         // 基本的なバリデーション
         if (parsed.candidate) {
