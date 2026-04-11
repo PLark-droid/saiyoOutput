@@ -179,9 +179,7 @@ export function convertCareerHistory(doc: CareerHistoryDocument): CareerHistoryB
 
   // Get summary
   const summarySection = doc.sections.find(s => s.section_id === 'summary');
-  const summary = summarySection && 'content' in summarySection && 'text' in summarySection.content
-    ? summarySection.content.text
-    : '';
+  const summary = getSectionText(summarySection);
 
   // Get work history
   const workHistorySection = doc.sections.find(s => s.section_id === 'work_history');
@@ -193,14 +191,16 @@ export function convertCareerHistory(doc: CareerHistoryDocument): CareerHistoryB
 
   // Get skills
   const skillsSection = doc.sections.find(s => s.section_id === 'skills');
-  const skills = skillsSection && 'content' in skillsSection && 'list_items' in skillsSection.content
-    ? formatSkills(skillsSection.content.list_items as ListItem[])
+  const skillsContent = getSectionObjectContent(skillsSection);
+  const skills = Array.isArray(skillsContent?.list_items)
+    ? formatSkills(skillsContent.list_items as ListItem[])
     : '';
 
   // Get self PR
   const selfPRSection = doc.sections.find(s => s.section_id === 'self_pr');
-  const selfPR = selfPRSection && 'content' in selfPRSection && 'pr_points' in selfPRSection.content
-    ? formatSelfPR(selfPRSection.content.pr_points as PRPoint[])
+  const selfPRContent = getSectionObjectContent(selfPRSection);
+  const selfPR = Array.isArray(selfPRContent?.pr_points)
+    ? formatSelfPR(selfPRContent.pr_points as PRPoint[])
     : '';
 
   // ベースレコード作成
@@ -263,6 +263,36 @@ interface ConditionTableRow {
   cells: ConditionCell[];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getSectionContent(section: unknown): unknown {
+  if (!isRecord(section)) return undefined;
+  return section.content;
+}
+
+/**
+ * section.content を安全にテキスト化する。
+ * - string の場合はそのまま返す
+ * - { text: string } の場合は .text を返す
+ * それ以外は ''。`'text' in string` の TypeError を防ぐため in 演算子使用前に型チェックする。
+ */
+function getSectionText(section: unknown): string {
+  const content = getSectionContent(section);
+  if (typeof content === 'string') return content;
+  if (isRecord(content) && 'text' in content) {
+    const t = (content as { text?: unknown }).text;
+    return typeof t === 'string' ? t : '';
+  }
+  return '';
+}
+
+function getSectionObjectContent(section: unknown): Record<string, unknown> | null {
+  const content = getSectionContent(section);
+  return isRecord(content) ? content : null;
+}
+
 function formatRecommendationReasons(reasons: RecommendationReason[]): string {
   const lines: string[] = [];
 
@@ -313,61 +343,74 @@ function getConditionValue(rows: ConditionTableRow[], listItems: ConditionListIt
 
 export function convertRecommendation(doc: RecommendationDocument): RecommendationBaseRecord {
   const candidateName = resolveCandidateName(doc.candidate_name);
-  const creationDate = doc.creation_date || doc.created_date || '';
+  const creationDate =
+    doc.creation_date || doc.created_date || (doc as unknown as { last_updated?: string }).last_updated || '';
 
   // Get sections by ID
-  const findSection = (id: string) => doc.sections.find(s => s.section_id === id);
+  const findSection = (...ids: string[]) => doc.sections.find(s => ids.includes(s.section_id));
 
-  // Text sections
-  const overviewSection = findSection('candidate_overview');
-  const overview = overviewSection && 'content' in overviewSection && 'text' in overviewSection.content
-    ? overviewSection.content.text
-    : '';
+  // Text sections — 新旧 section_id と 文字列/オブジェクト両形式の content に対応
+  const overviewSection = findSection('candidate_overview', 'overview');
+  const overview = getSectionText(overviewSection);
 
-  // reason_for_change または reason_for_job_change をサポート
-  const reasonSection = findSection('reason_for_change') || findSection('reason_for_job_change');
-  const reason = reasonSection && 'content' in reasonSection && 'text' in reasonSection.content
-    ? reasonSection.content.text
-    : '';
+  const reasonSection = findSection('reason_for_change', 'reason_for_job_change');
+  const reason = getSectionText(reasonSection);
 
-  // Recommendation reasons — recommendation_reason または recommendation_reasons をサポート
-  const recReasonSection = findSection('recommendation_reason') || findSection('recommendation_reasons');
+  // Recommendation reasons — 旧形式(content.reasons) と 新形式(section直下 list_items) を両対応
+  const recReasonSection = findSection('recommendation_reason', 'recommendation_reasons');
   let recommendationReasons = '';
   let aspirationAndPotential = '';
   let overallAssessment = '';
 
-  if (recReasonSection && 'content' in recReasonSection) {
-    const content = recReasonSection.content as RecommendationReasonContent;
+  if (recReasonSection) {
+    // 新形式: section 直下の list_items
+    const topLevelListItems = (recReasonSection as unknown as {
+      list_items?: Array<{ id?: string; title?: string; heading?: string; content?: string; description?: string }>;
+    }).list_items;
 
-    // 推薦理由本文
-    if (content.introduction && content.reasons) {
-      recommendationReasons = content.introduction + '\n\n' + formatRecommendationReasons(content.reasons);
-    }
+    if (Array.isArray(topLevelListItems) && topLevelListItems.length > 0) {
+      recommendationReasons = topLevelListItems
+        .map(item => {
+          const heading = item.title || item.heading || '';
+          const text = item.content || item.description || '';
+          return heading ? `【${heading}】\n${text}` : text;
+        })
+        .join('\n\n');
+    } else {
+      const content = getSectionObjectContent(recReasonSection) as RecommendationReasonContent | null;
+      if (!content) {
+        recommendationReasons = '';
+      } else {
+        if (content.introduction && content.reasons) {
+          recommendationReasons = content.introduction + '\n\n' + formatRecommendationReasons(content.reasons);
+        } else if (content.reasons) {
+          recommendationReasons = formatRecommendationReasons(content.reasons);
+        }
 
-    // 志向性と将来性（recommendation_reason内のネスト形式）
-    if (content.aspiration_and_potential) {
-      aspirationAndPotential = `【${content.aspiration_and_potential.heading}】\n${content.aspiration_and_potential.content}`;
-    }
-
-    // 総評（recommendation_reason内のネスト形式）
-    if (content.overall_assessment) {
-      overallAssessment = `【${content.overall_assessment.heading}】\n${content.overall_assessment.content}`;
+        if (content.aspiration_and_potential) {
+          aspirationAndPotential = `【${content.aspiration_and_potential.heading}】\n${content.aspiration_and_potential.content}`;
+        }
+        if (content.overall_assessment) {
+          overallAssessment = `【${content.overall_assessment.heading}】\n${content.overall_assessment.content}`;
+        }
+      }
     }
   }
 
-  // 志向性と将来性（独立セクション形式）
+  // 志向性と将来性（独立セクション形式） — vision も新名称として対応
   if (!aspirationAndPotential) {
-    const aspirationSection = findSection('candidate_aspiration');
-    if (aspirationSection && 'content' in aspirationSection && 'text' in aspirationSection.content) {
-      aspirationAndPotential = aspirationSection.content.text;
-    }
+    const aspirationSection = findSection('candidate_aspiration', 'vision');
+    aspirationAndPotential = getSectionText(aspirationSection);
   }
 
-  // 総評（独立セクション形式）
+  // 総評（独立セクション形式） — total_review も新名称として対応
   if (!overallAssessment) {
-    const assessmentSection = findSection('overall_assessment');
-    if (assessmentSection && 'content' in assessmentSection) {
-      const content = assessmentSection.content as { text?: string; closing?: string };
+    const assessmentSection = findSection('overall_assessment', 'total_review');
+    const rawContent = getSectionContent(assessmentSection);
+    if (typeof rawContent === 'string') {
+      overallAssessment = rawContent;
+    } else if (isRecord(rawContent)) {
+      const content = rawContent as { text?: string; closing?: string };
       const parts: string[] = [];
       if (content.text) parts.push(content.text);
       if (content.closing) parts.push(content.closing);
@@ -375,23 +418,59 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
     }
   }
 
-  // Conditions — テーブル形式 と list_items 形式の両方に対応
+  // Conditions — セクション形式(table/list_items) と ドキュメント直下オブジェクト形式の両方に対応
   const conditionsSection = findSection('conditions');
   let conditionRows: ConditionTableRow[] = [];
   let conditionListItems: ConditionListItem[] = [];
 
-  if (conditionsSection && 'content' in conditionsSection) {
-    const content = conditionsSection.content as unknown as {
+  const conditionsContent = getSectionObjectContent(conditionsSection);
+  if (conditionsContent) {
+    const content = conditionsContent as {
       table?: { rows: ConditionTableRow[] };
       list_items?: ConditionListItem[];
     };
-    if (content.table?.rows) {
-      conditionRows = content.table.rows;
-    }
-    if (content.list_items) {
-      conditionListItems = content.list_items;
-    }
+    if (content.table?.rows) conditionRows = content.table.rows;
+    if (content.list_items) conditionListItems = content.list_items;
   }
+
+  // ドキュメント直下の conditions オブジェクト（新形式）
+  const topLevelConditions = (doc as unknown as { conditions?: Record<string, string> }).conditions;
+  const hasTopLevelConditions =
+    !!topLevelConditions &&
+    typeof topLevelConditions === 'object' &&
+    !Array.isArray(topLevelConditions);
+
+  const topLevelConditionKeyMap: Record<string, string[]> = {
+    希望年収: ['expected_annual_income', 'annual_income', 'income', 'salary'],
+    転職時期: ['timing', 'start_timing', 'join_timing'],
+    希望勤務地: ['location', 'work_location', 'preferred_location'],
+    希望休日: ['holiday', 'holidays', 'days_off'],
+    希望職種: ['occupation', 'job_type', 'position'],
+    その他条件: ['others', 'other', 'remarks', 'notes'],
+  };
+
+  const legacyConditionLabelMap: Record<keyof typeof topLevelConditionKeyMap, string[]> = {
+    希望年収: ['希望年収'],
+    転職時期: ['転職時期', '入社希望時期', '希望時期'],
+    希望勤務地: ['勤務地', '希望勤務地'],
+    希望休日: ['休日', '希望休日'],
+    希望職種: ['職種', '希望職種'],
+    その他条件: ['その他', 'その他条件'],
+  };
+
+  const getConditionForLabel = (label: keyof typeof topLevelConditionKeyMap): string => {
+    if (hasTopLevelConditions && topLevelConditions) {
+      for (const key of topLevelConditionKeyMap[label]) {
+        const v = topLevelConditions[key];
+        if (typeof v === 'string' && v) return v;
+      }
+    }
+    for (const legacyLabel of legacyConditionLabelMap[label]) {
+      const value = getConditionValue(conditionRows, conditionListItems, legacyLabel);
+      if (value) return value;
+    }
+    return '';
+  };
 
   return {
     候補者名: candidateName,
@@ -401,12 +480,12 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
     推薦理由: recommendationReasons,
     志向性と将来性: aspirationAndPotential,
     総評: overallAssessment,
-    希望年収: getConditionValue(conditionRows, conditionListItems, '希望年収'),
-    転職時期: getConditionValue(conditionRows, conditionListItems, '転職時期'),
-    希望勤務地: getConditionValue(conditionRows, conditionListItems, '勤務地'),
-    希望休日: getConditionValue(conditionRows, conditionListItems, '休日'),
-    希望職種: getConditionValue(conditionRows, conditionListItems, '職種'),
-    その他条件: getConditionValue(conditionRows, conditionListItems, 'その他'),
+    希望年収: getConditionForLabel('希望年収'),
+    転職時期: getConditionForLabel('転職時期'),
+    希望勤務地: getConditionForLabel('希望勤務地'),
+    希望休日: getConditionForLabel('希望休日'),
+    希望職種: getConditionForLabel('希望職種'),
+    その他条件: getConditionForLabel('その他条件'),
     元データJSON: JSON.stringify(doc, null, 2),
   };
 }
@@ -612,9 +691,7 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
 
   // はじめに (introduction)
   const introSection = findSection('introduction', 'career_vision');
-  const introduction = introSection && 'content' in introSection && 'text' in introSection.content
-    ? introSection.content.text || ''
-    : '';
+  const introduction = getSectionText(introSection);
 
   // 短期計画 (short_term)
   const shortTermSection = findSection('short_term', 'short_term_plan');

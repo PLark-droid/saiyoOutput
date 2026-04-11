@@ -139,7 +139,30 @@ export interface RecommendationDocument {
   candidate_name: CandidateName;
   creation_date?: string;
   created_date?: string;
+  last_updated?: string;
   sections: RecommendationSection[];
+  conditions?: {
+    expected_annual_income?: string;
+    annual_income?: string;
+    income?: string;
+    salary?: string;
+    timing?: string;
+    start_timing?: string;
+    join_timing?: string;
+    location?: string;
+    work_location?: string;
+    preferred_location?: string;
+    holiday?: string;
+    holidays?: string;
+    days_off?: string;
+    occupation?: string;
+    job_type?: string;
+    position?: string;
+    others?: string;
+    other?: string;
+    remarks?: string;
+    notes?: string;
+  };
   footer?: {
     recommender?: string;
     creation_date?: string;
@@ -154,23 +177,49 @@ export type RecommendationSection =
   | ConditionsSection;
 
 export interface TextSection {
-  section_id: 'candidate_overview' | 'reason_for_job_change' | 'reason_for_change' | 'candidate_aspiration' | 'overall_assessment' | 'summary';
+  section_id:
+    | 'candidate_overview'
+    | 'overview'
+    | 'reason_for_job_change'
+    | 'reason_for_change'
+    | 'candidate_aspiration'
+    | 'vision'
+    | 'overall_assessment'
+    | 'total_review'
+    | 'summary';
   heading: string;
-  heading_level: string;
-  content: {
-    text: string;
-    closing?: string;
-  };
+  heading_level?: string;
+  content:
+    | string
+    | {
+      text?: string;
+      closing?: string;
+    };
 }
 
 export interface RecommendationReasonSection {
   section_id: 'recommendation_reason' | 'recommendation_reasons';
   heading: string;
-  heading_level: string;
-  content: {
-    introduction: string;
-    reasons: RecommendationReason[];
+  heading_level?: string;
+  content?: {
+    introduction?: string;
+    reasons?: RecommendationReason[];
+    aspiration_and_potential?: {
+      heading: string;
+      content: string;
+    };
+    overall_assessment?: {
+      heading: string;
+      content: string;
+    };
   };
+  list_items?: {
+    id?: string;
+    title?: string;
+    heading?: string;
+    content?: string;
+    description?: string;
+  }[];
 }
 
 export interface RecommendationReason {
@@ -229,10 +278,12 @@ export type CareerPlanSection =
 export interface CareerVisionSection {
   section_id: 'career_vision' | 'introduction';
   heading: string;
-  heading_level: string;
-  content: {
-    text?: string;
-  };
+  heading_level?: string;
+  content:
+    | string
+    | {
+      text?: string;
+    };
 }
 
 export interface PlanSection {

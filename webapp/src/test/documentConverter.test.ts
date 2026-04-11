@@ -162,6 +162,51 @@ const sampleRecommendation: RecommendationDocument = {
   },
 };
 
+const sampleRecommendationNewFormat: RecommendationDocument = {
+  document_type: '推薦文',
+  last_updated: '2026年4月9日',
+  candidate_name: '石原智幸',
+  sections: [
+    {
+      section_id: 'overview',
+      heading: '■ 候補者概要',
+      content: '石原様は...',
+    },
+    {
+      section_id: 'reason_for_job_change',
+      heading: '■ 転職理由',
+      content: '現職での「番頭」業務...',
+    },
+    {
+      section_id: 'recommendation_reasons',
+      heading: '■ 推薦理由',
+      list_items: [
+        { id: 'rec_1', title: '圧倒的な安全管理実績', content: '...' },
+        { id: 'rec_2', title: '一気通貫で...', content: '...' },
+        { id: 'rec_3', title: '誠実な...', content: '...' },
+      ],
+    },
+    {
+      section_id: 'vision',
+      heading: '### 志向性と将来性',
+      content: '石原様は...',
+    },
+    {
+      section_id: 'total_review',
+      heading: '### 総評',
+      content: '人間性...',
+    },
+  ],
+  conditions: {
+    expected_annual_income: '800万円〜900万円',
+    timing: '決定後1〜2ヶ月',
+    location: '練馬区から30分圏内',
+    holiday: '完全週休二日制',
+    occupation: '施工管理',
+    others: '転勤なし',
+  },
+};
+
 const sampleCareerPlan: CareerPlanDocument = {
   document_type: 'キャリアプラン',
   candidate_name: '山田太郎',
@@ -337,6 +382,54 @@ const sampleCareerPlanNewFormat: CareerPlanDocument = {
   ],
 };
 
+const sampleCareerPlanStringIntro = {
+  document_type: 'キャリアプラン',
+  candidate_name: '佐藤花子',
+  creation_date: '2026年4月9日',
+  sections: [
+    {
+      section_id: 'introduction',
+      heading: '■ はじめに',
+      content: '文字列のイントロダクション',
+    },
+    {
+      section_id: 'short_term',
+      heading: '■ 短期計画',
+      content: {
+        text: '短期計画',
+      },
+    },
+    {
+      section_id: 'mid_term',
+      heading: '■ 中期計画',
+      content: {
+        text: '中期計画',
+      },
+    },
+    {
+      section_id: 'long_term',
+      heading: '■ 長期計画',
+      content: {
+        text: '長期計画',
+      },
+    },
+    {
+      section_id: 'potential',
+      heading: '■ ポテンシャル',
+      content: {
+        text: 'ポテンシャル',
+      },
+    },
+    {
+      section_id: 'summary',
+      heading: '■ まとめ',
+      content: {
+        text: 'まとめ',
+      },
+    },
+  ],
+} as CareerPlanDocument;
+
 describe('detectDocumentType', () => {
   it('職務経歴書を正しく検出する', () => {
     expect(detectDocumentType(sampleCareerHistory)).toBe('職務経歴書');
@@ -405,6 +498,26 @@ describe('convertRecommendation', () => {
     expect(result.希望年収).toBe('500万円以上');
     expect(result.希望勤務地).toBe('東京都内');
   });
+
+  it('新形式の推薦文でも文字列contentで落ちずに変換する', () => {
+    expect(() => convertRecommendation(sampleRecommendationNewFormat)).not.toThrow();
+
+    const result = convertRecommendation(sampleRecommendationNewFormat);
+
+    expect(result.候補者名).toBe('石原智幸');
+    expect(result.作成日).toBe('2026年4月9日');
+    expect(result.候補者概要).toBe('石原様は...');
+    expect(result.転職理由).toBe('現職での「番頭」業務...');
+    expect(result.推薦理由).toContain('圧倒的な安全管理実績');
+    expect(result.志向性と将来性).toBe('石原様は...');
+    expect(result.総評).toBe('人間性...');
+    expect(result.希望年収).toBe('800万円〜900万円');
+    expect(result.転職時期).toBe('決定後1〜2ヶ月');
+    expect(result.希望勤務地).toBe('練馬区から30分圏内');
+    expect(result.希望休日).toBe('完全週休二日制');
+    expect(result.希望職種).toBe('施工管理');
+    expect(result.その他条件).toBe('転勤なし');
+  });
 });
 
 describe('convertCareerPlan', () => {
@@ -433,6 +546,11 @@ describe('convertCareerPlan', () => {
     expect(result.ポテンシャル).toContain('面談から見える強みです。');
     expect(result.キャリアロードマップ).toContain('1年後 | PLとして案件推進');
   });
+
+  it('文字列contentのイントロダクションでもエラーなく変換する', () => {
+    const result = convertCareerPlan(sampleCareerPlanStringIntro);
+    expect(result.はじめに).toBe('文字列のイントロダクション');
+  });
 });
 
 describe('convertDocument', () => {
@@ -444,6 +562,12 @@ describe('convertDocument', () => {
 
   it('推薦文を統合変換する', () => {
     const result = convertDocument(sampleRecommendation);
+    expect(result.type).toBe('推薦文');
+    expect('候補者概要' in result.record).toBe(true);
+  });
+
+  it('新形式の推薦文を統合変換する', () => {
+    const result = convertDocument(sampleRecommendationNewFormat);
     expect(result.type).toBe('推薦文');
     expect('候補者概要' in result.record).toBe(true);
   });
