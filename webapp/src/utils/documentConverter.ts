@@ -296,15 +296,14 @@ function getSectionObjectContent(section: unknown): Record<string, unknown> | nu
 function formatRecommendationReasons(reasons: RecommendationReason[]): string {
   const lines: string[] = [];
 
-  for (const reason of reasons) {
-    lines.push(`【${reason.heading}】`);
-    // description または content をサポート
+  reasons.forEach((reason, idx) => {
+    lines.push(`${idx + 1}. ${reason.heading}`);
     const text = reason.description || reason.content || '';
     lines.push(text);
     lines.push('');
-  }
+  });
 
-  return lines.join('\n');
+  return lines.join('\n').trimEnd();
 }
 
 function getConditionValueFromTable(rows: ConditionTableRow[], label: string): string {
@@ -370,10 +369,10 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
 
     if (Array.isArray(topLevelListItems) && topLevelListItems.length > 0) {
       recommendationReasons = topLevelListItems
-        .map(item => {
+        .map((item, idx) => {
           const heading = item.title || item.heading || '';
           const text = item.content || item.description || '';
-          return heading ? `【${heading}】\n${text}` : text;
+          return heading ? `${idx + 1}. ${heading}\n${text}` : text;
         })
         .join('\n\n');
     } else {
