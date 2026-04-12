@@ -535,88 +535,6 @@ interface CareerPlanSectionContent {
   final_message?: string;
 }
 
-function formatBulletList(items: string[] | undefined): string[] {
-  return (items || []).map(item => `・${item}`);
-}
-
-function formatCareerPlanSection(content: CareerPlanSectionContent): string {
-  const lines: string[] = [];
-
-  if (content.text) {
-    lines.push(content.text);
-    lines.push('');
-  }
-
-  if (content.introduction) {
-    lines.push(content.introduction);
-    lines.push('');
-  }
-
-  if (content.phase && content.goal) {
-    lines.push(`【${content.phase}】`);
-    lines.push(`目標: ${content.goal}`);
-    lines.push('');
-  }
-
-  if (content.recommended_positions) {
-    lines.push(`${content.recommended_positions.heading}:`);
-    (content.recommended_positions.list_items || []).forEach(item => {
-      lines.push(`・${item.content}`);
-    });
-    lines.push('');
-  }
-
-  if (content.target_income) {
-    lines.push(`${content.target_income.heading}: ${content.target_income.content}`);
-    lines.push('');
-  }
-
-  if (content.skills_to_acquire) {
-    lines.push(`${content.skills_to_acquire.heading}:`);
-    (content.skills_to_acquire.list_items || []).forEach(item => {
-      lines.push(`・${item.content}`);
-    });
-    lines.push('');
-  }
-
-  if (content.career_strategy) {
-    lines.push(`${content.career_strategy.heading}:`);
-    lines.push(content.career_strategy.content);
-    lines.push('');
-  }
-
-  if (content.goals) {
-    for (const goal of content.goals) {
-      lines.push(`【${goal.heading}】`);
-      lines.push(goal.content);
-
-      const detailLines = [
-        ...formatBulletList(goal.targets),
-        ...formatBulletList(goal.initiatives),
-        ...formatBulletList(goal.skills),
-        ...formatBulletList(goal.roles),
-        ...formatBulletList(goal.activities),
-      ];
-
-      if (detailLines.length > 0) {
-        lines.push(...detailLines);
-      }
-
-      if (goal.conclusion) {
-        lines.push(goal.conclusion);
-      }
-
-      lines.push('');
-    }
-  }
-
-  if (content.conclusion) {
-    lines.push(content.conclusion);
-  }
-
-  return lines.join('\n').trim();
-}
-
 function formatPotentialsSection(content: CareerPlanSectionContent): string {
   const lines: string[] = [];
 
@@ -681,61 +599,156 @@ function formatRoadmap(content: CareerPlanSectionContent): string {
   return lines.join('\n');
 }
 
+interface PeriodFields {
+  目標: string;
+  推奨職種: string;
+  目標年収: string;
+  習得すべきスキル: string;
+  キャリア戦略: string;
+}
+
+function extractPeriodFields(section: unknown): PeriodFields {
+  const empty: PeriodFields = { 目標: '', 推奨職種: '', 目標年収: '', 習得すべきスキル: '', キャリア戦略: '' };
+  if (!isRecord(section) || !isRecord(section.content)) return empty;
+  const c = section.content as CareerPlanSectionContent & {
+    positions?: string[];
+    income?: string;
+    skills?: string[];
+    strategy?: string;
+  };
+
+  const goal = c.goal || '';
+
+  // 推奨職種: flat array or nested object
+  let positions = '';
+  if (Array.isArray(c.positions)) {
+    positions = c.positions.map(p => `・${p}`).join('\n');
+  } else if (c.recommended_positions?.list_items) {
+    positions = c.recommended_positions.list_items.map(i => `・${i.content}`).join('\n');
+  }
+
+  // 目標年収
+  let income = '';
+  if (typeof c.income === 'string') {
+    income = c.income;
+  } else if (c.target_income) {
+    income = c.target_income.content;
+  }
+
+  // 習得すべきスキル
+  let skills = '';
+  if (Array.isArray(c.skills)) {
+    skills = c.skills.map(s => `・${s}`).join('\n');
+  } else if (c.skills_to_acquire?.list_items) {
+    skills = c.skills_to_acquire.list_items.map(i => `・${i.content}`).join('\n');
+  }
+
+  // キャリア戦略
+  let strategy = '';
+  if (typeof c.strategy === 'string') {
+    strategy = c.strategy;
+  } else if (c.career_strategy) {
+    strategy = c.career_strategy.content;
+  }
+
+  return { 目標: goal, 推奨職種: positions, 目標年収: income, 習得すべきスキル: skills, キャリア戦略: strategy };
+}
+
 export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord {
   const candidateName = resolveCandidateName(doc.candidate_name);
-  const creationDate = doc.creation_date || doc.created_date || doc.footer?.creation_date || '';
+  const creationDate = doc.creation_date || doc.created_date
+    || doc.footer?.creation_date
+    || (doc as unknown as { last_updated?: string }).last_updated || '';
 
-  // Get sections by ID
   const findSection = (...ids: string[]) => doc.sections.find(s => ids.includes(s.section_id));
 
-  // はじめに (introduction)
+  // はじめに
   const introSection = findSection('introduction', 'career_vision');
   const introduction = getSectionText(introSection);
 
-  // 短期計画 (short_term)
-  const shortTermSection = findSection('short_term', 'short_term_plan');
-  const shortTerm = shortTermSection && 'content' in shortTermSection
-    ? formatCareerPlanSection(shortTermSection.content as CareerPlanSectionContent)
-    : '';
+  // 各期間のフィールド抽出
+  const short = extractPeriodFields(findSection('short_term', 'short_term_plan'));
+  const mid = extractPeriodFields(findSection('mid_term', 'mid_term_plan'));
+  const long = extractPeriodFields(findSection('long_term', 'long_term_plan'));
 
-  // 中期計画 (mid_term)
-  const midTermSection = findSection('mid_term', 'mid_term_plan');
-  const midTerm = midTermSection && 'content' in midTermSection
-    ? formatCareerPlanSection(midTermSection.content as CareerPlanSectionContent)
-    : '';
-
-  // 長期計画 (long_term)
-  const longTermSection = findSection('long_term', 'long_term_plan');
-  const longTerm = longTermSection && 'content' in longTermSection
-    ? formatCareerPlanSection(longTermSection.content as CareerPlanSectionContent)
-    : '';
-
-  // ポテンシャル (hidden_potential)
+  // ポテンシャル — content.potentials(旧) / section直下 list_items(新) を両対応
   const potentialSection = findSection('hidden_potential', 'potential');
-  const potentials = potentialSection && 'content' in potentialSection
-    ? formatPotentialsSection(potentialSection.content as CareerPlanSectionContent)
-    : '';
+  let potentials = '';
+  if (potentialSection) {
+    const topListItems = (potentialSection as unknown as {
+      list_items?: Array<{ id?: string; title?: string; heading?: string; content?: string }>;
+    }).list_items;
 
-  // まとめ (conclusion)
-  const summarySection = findSection('conclusion', 'summary');
-  const conclusion = summarySection && 'content' in summarySection
-    ? formatConclusionSection(summarySection.content as CareerPlanSectionContent)
-    : '';
+    if (Array.isArray(topListItems) && topListItems.length > 0) {
+      potentials = topListItems
+        .map((item, idx) => {
+          const heading = item.title || item.heading || '';
+          const text = item.content || '';
+          return heading ? `${idx + 1}. ${heading}\n${text}` : text;
+        })
+        .join('\n\n');
+    } else if (isRecord(potentialSection) && isRecord(potentialSection.content)) {
+      potentials = formatPotentialsSection(potentialSection.content as CareerPlanSectionContent);
+    }
+  }
 
-  // キャリアロードマップ
-  const roadmap = summarySection && 'content' in summarySection
-    ? formatRoadmap(summarySection.content as CareerPlanSectionContent)
-    : '';
+  // 総括 — ドキュメント直下の summary.text または conclusion セクション
+  const topSummary = (doc as unknown as { summary?: { text?: string } }).summary;
+  let summaryText = '';
+  if (topSummary && typeof topSummary.text === 'string') {
+    summaryText = topSummary.text;
+  } else {
+    const summarySection = findSection('conclusion', 'summary');
+    if (summarySection && isRecord(summarySection) && isRecord(summarySection.content)) {
+      summaryText = formatConclusionSection(summarySection.content as CareerPlanSectionContent);
+    }
+  }
+
+  // キャリアロードマップ — ドキュメント直下の summary.roadmap_table またはセクション内
+  const topRoadmapTable = (doc as unknown as {
+    summary?: { roadmap_table?: Array<{ phase: string; period: string; goal: string; income: string }> };
+  }).summary?.roadmap_table;
+  let roadmap = '';
+  if (Array.isArray(topRoadmapTable) && topRoadmapTable.length > 0) {
+    const header = 'フェーズ | 期間 | 目標 | 目標年収';
+    const rows = topRoadmapTable.map(r => `${r.phase} | ${r.period} | ${r.goal} | ${r.income}`);
+    roadmap = [header, ...rows].join('\n');
+  } else {
+    const summarySection = findSection('conclusion', 'summary');
+    if (summarySection && isRecord(summarySection) && isRecord(summarySection.content)) {
+      roadmap = formatRoadmap(summarySection.content as CareerPlanSectionContent);
+    }
+  }
+
+  // まとめ closing text
+  let closing = '';
+  const topFinalMsg = (doc as unknown as { summary?: { final_message?: string } }).summary;
+  if (topFinalMsg && typeof topFinalMsg.final_message === 'string') {
+    closing = topFinalMsg.final_message;
+  }
 
   return {
     候補者名: candidateName,
     作成日: creationDate,
     はじめに: introduction,
-    短期計画: shortTerm,
-    中期計画: midTerm,
-    長期計画: longTerm,
+    短期_目標: short.目標,
+    短期_推奨職種: short.推奨職種,
+    短期_目標年収: short.目標年収,
+    短期_習得すべきスキル: short.習得すべきスキル,
+    短期_キャリア戦略: short.キャリア戦略,
+    中期_目標: mid.目標,
+    中期_推奨職種: mid.推奨職種,
+    中期_目標年収: mid.目標年収,
+    中期_習得すべきスキル: mid.習得すべきスキル,
+    中期_キャリア戦略: mid.キャリア戦略,
+    長期_目標: long.目標,
+    長期_推奨職種: long.推奨職種,
+    長期_目標年収: long.目標年収,
+    長期_習得すべきスキル: long.習得すべきスキル,
+    長期_キャリア戦略: long.キャリア戦略,
     ポテンシャル: potentials,
-    まとめ: conclusion,
+    総括: summaryText,
+    まとめ: closing,
     キャリアロードマップ: roadmap,
     元データJSON: JSON.stringify(doc, null, 2),
   };

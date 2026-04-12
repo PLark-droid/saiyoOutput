@@ -521,28 +521,27 @@ describe('convertRecommendation', () => {
 });
 
 describe('convertCareerPlan', () => {
-  it('キャリアプランを正しく変換する', () => {
+  it('キャリアプランを正しく変換する（旧goals形式）', () => {
     const result = convertCareerPlan(sampleCareerPlan);
 
     expect(result.候補者名).toBe('山田太郎');
     expect(result.作成日).toBe('2025年12月23日');
     expect(result.はじめに).toBeDefined();
-    expect(result.短期計画).toBeDefined();
-    expect(result.中期計画).toBeDefined();
-    expect(result.長期計画).toBeDefined();
     expect(result.ポテンシャル).toBeDefined();
-    expect(result.まとめ).toBeDefined();
+    expect(result.総括).toBeDefined();
   });
 
-  it('新形式のキャリアプランでもエラーなく変換する', () => {
+  it('新形式のキャリアプランでサブフィールドに分割変換する', () => {
     const result = convertCareerPlan(sampleCareerPlanNewFormat);
 
     expect(result.候補者名).toBe('田中 太郎');
     expect(result.作成日).toBe('2026年3月3日');
     expect(result.はじめに).toBe('事業成長を支えるPMになりたい。');
-    expect(result.短期計画).toContain('プロジェクトリーダー');
-    expect(result.中期計画).toContain('予実管理');
-    expect(result.長期計画).toContain('新規事業と既存事業の両方を経験する。');
+    expect(result.短期_目標).toBe('PM補佐として案件推進力を高める');
+    expect(result.短期_推奨職種).toContain('プロジェクトリーダー');
+    expect(result.中期_目標).toBe('複数案件の統括を担う');
+    expect(result.中期_習得すべきスキル).toContain('予実管理');
+    expect(result.長期_キャリア戦略).toContain('新規事業と既存事業の両方を経験する。');
     expect(result.ポテンシャル).toContain('面談から見える強みです。');
     expect(result.キャリアロードマップ).toContain('1年後 | PLとして案件推進');
   });
@@ -550,6 +549,61 @@ describe('convertCareerPlan', () => {
   it('文字列contentのイントロダクションでもエラーなく変換する', () => {
     const result = convertCareerPlan(sampleCareerPlanStringIntro);
     expect(result.はじめに).toBe('文字列のイントロダクション');
+  });
+
+  it('flat形式(positions/income/skills/strategy)を正しく分割する', () => {
+    const flatDoc: CareerPlanDocument = {
+      document_type: 'キャリアプラン',
+      candidate_name: '石原智幸',
+      sections: [
+        {
+          section_id: 'introduction',
+          heading: '■ はじめに',
+          content: 'テスト',
+        } as any,
+        {
+          section_id: 'short_term',
+          heading: '■ 短期目標',
+          heading_level: 'heading1',
+          content: {
+            phase: '短期(1〜2年)',
+            goal: '信頼を築く',
+            positions: ['施工管理主任候補', '現場責任者'],
+            income: '800万円〜850万円',
+            skills: ['施工工法の習得', 'リレーション構築'],
+            strategy: '段取り力を活かす。',
+          },
+        },
+      ],
+    } as CareerPlanDocument;
+
+    const result = convertCareerPlan(flatDoc);
+    expect(result.短期_目標).toBe('信頼を築く');
+    expect(result.短期_推奨職種).toBe('・施工管理主任候補\n・現場責任者');
+    expect(result.短期_目標年収).toBe('800万円〜850万円');
+    expect(result.短期_習得すべきスキル).toContain('施工工法の習得');
+    expect(result.短期_キャリア戦略).toBe('段取り力を活かす。');
+  });
+
+  it('ドキュメント直下のsummaryから総括・ロードマップを取得する', () => {
+    const docWithTopSummary = {
+      document_type: 'キャリアプラン',
+      candidate_name: '石原智幸',
+      last_updated: '2026年4月9日',
+      sections: [
+        { section_id: 'introduction', heading: '■', content: 'intro' },
+      ],
+      summary: {
+        text: '石原様のキャリアは美しく繋がっています。',
+        roadmap_table: [
+          { phase: '短期', period: '1〜2年', goal: '信頼確立', income: '800万円' },
+        ],
+      },
+    } as unknown as CareerPlanDocument;
+
+    const result = convertCareerPlan(docWithTopSummary);
+    expect(result.総括).toBe('石原様のキャリアは美しく繋がっています。');
+    expect(result.キャリアロードマップ).toContain('短期 | 1〜2年 | 信頼確立 | 800万円');
   });
 });
 
