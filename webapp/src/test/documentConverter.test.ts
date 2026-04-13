@@ -543,7 +543,6 @@ describe('convertCareerPlan', () => {
     expect(result.中期_習得すべきスキル).toContain('予実管理');
     expect(result.長期_キャリア戦略).toContain('新規事業と既存事業の両方を経験する。');
     expect(result.ポテンシャル).toContain('面談から見える強みです。');
-    expect(result.キャリアロードマップ).toContain('1年後 | PLとして案件推進');
   });
 
   it('文字列contentのイントロダクションでもエラーなく変換する', () => {
@@ -585,7 +584,7 @@ describe('convertCareerPlan', () => {
     expect(result.短期_キャリア戦略).toBe('段取り力を活かす。');
   });
 
-  it('ドキュメント直下のsummaryから総括・ロードマップを取得する', () => {
+  it('ドキュメント直下のsummaryから総括・ロードマップ目標を取得する', () => {
     const docWithTopSummary = {
       document_type: 'キャリアプラン',
       candidate_name: '石原智幸',
@@ -597,13 +596,46 @@ describe('convertCareerPlan', () => {
         text: '石原様のキャリアは美しく繋がっています。',
         roadmap_table: [
           { phase: '短期', period: '1〜2年', goal: '信頼確立', income: '800万円' },
+          { phase: '中期', period: '3〜4年', goal: '大規模案件完遂', income: '900万円' },
+          { phase: '長期', period: '5年以降', goal: '部門統括', income: '1,000万円' },
         ],
       },
     } as unknown as CareerPlanDocument;
 
     const result = convertCareerPlan(docWithTopSummary);
     expect(result.総括).toBe('石原様のキャリアは美しく繋がっています。');
-    expect(result.キャリアロードマップ).toContain('短期 | 1〜2年 | 信頼確立 | 800万円');
+    expect(result.短期_ロードマップ目標).toBe('信頼確立');
+    expect(result.中期_ロードマップ目標).toBe('大規模案件完遂');
+    expect(result.長期_ロードマップ目標).toBe('部門統括');
+  });
+
+  it('セクション heading からテーマ（副題）を抽出する', () => {
+    const docWithThemes = {
+      document_type: 'キャリアプラン',
+      candidate_name: '石原智幸',
+      sections: [
+        {
+          section_id: 'short_term',
+          heading: '■ 短期目標(1〜2年)：新領域への適応と施工技術の拡張',
+          content: { goal: 'g' },
+        },
+        {
+          section_id: 'mid_term',
+          heading: '■ 中期目標(3〜4年)：プロジェクトリーダーとしての飛躍',
+          content: { goal: 'g' },
+        },
+        {
+          section_id: 'long_term',
+          heading: '■ 長期目標(5年以降)：組織マネジメントへの参画',
+          content: { goal: 'g' },
+        },
+      ],
+    } as unknown as CareerPlanDocument;
+
+    const result = convertCareerPlan(docWithThemes);
+    expect(result.短期_テーマ).toBe('新領域への適応と施工技術の拡張');
+    expect(result.中期_テーマ).toBe('プロジェクトリーダーとしての飛躍');
+    expect(result.長期_テーマ).toBe('組織マネジメントへの参画');
   });
 });
 

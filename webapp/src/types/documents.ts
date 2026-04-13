@@ -452,25 +452,30 @@ export interface CareerPlanBaseRecord {
   候補者名: string;
   作成日: string;
   はじめに: string;
+  短期_テーマ: string;
   短期_目標: string;
   短期_推奨職種: string;
   短期_目標年収: string;
   短期_習得すべきスキル: string;
   短期_キャリア戦略: string;
+  短期_ロードマップ目標: string;
+  中期_テーマ: string;
   中期_目標: string;
   中期_推奨職種: string;
   中期_目標年収: string;
   中期_習得すべきスキル: string;
   中期_キャリア戦略: string;
+  中期_ロードマップ目標: string;
+  長期_テーマ: string;
   長期_目標: string;
   長期_推奨職種: string;
   長期_目標年収: string;
   長期_習得すべきスキル: string;
   長期_キャリア戦略: string;
+  長期_ロードマップ目標: string;
   ポテンシャル: string;
   総括: string;
   まとめ: string;
-  キャリアロードマップ: string;
   元データJSON: string;
 }
 

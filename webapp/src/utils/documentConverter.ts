@@ -583,22 +583,6 @@ function formatConclusionSection(content: CareerPlanSectionContent): string {
   return lines.join('\n').trim();
 }
 
-function formatRoadmap(content: CareerPlanSectionContent): string {
-  if (!content.roadmap?.table?.rows || content.roadmap.table.rows.length === 0) return '';
-
-  const lines: string[] = [];
-  lines.push(`【${content.roadmap.heading}】`);
-
-  for (const row of content.roadmap.table.rows) {
-    const cells = (row.cells || []).map(c => c.content).join(' | ');
-    if (cells) {
-      lines.push(cells);
-    }
-  }
-
-  return lines.join('\n');
-}
-
 interface PeriodFields {
   目標: string;
   推奨職種: string;
@@ -654,6 +638,18 @@ function extractPeriodFields(section: unknown): PeriodFields {
   return { 目標: goal, 推奨職種: positions, 目標年収: income, 習得すべきスキル: skills, キャリア戦略: strategy };
 }
 
+/**
+ * セクション heading から副題（テーマ）を抽出する。
+ * 例: "■ 短期目標(1〜2年)：新領域への適応と施工技術の拡張" → "新領域への適応と施工技術の拡張"
+ * 全角「：」と半角「:」両対応。区切りがなければ空文字。
+ */
+function extractTheme(section: unknown): string {
+  if (!isRecord(section)) return '';
+  const heading = typeof section.heading === 'string' ? section.heading : '';
+  const match = heading.match(/[：:]\s*(.+)$/);
+  return match ? match[1].trim() : '';
+}
+
 export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord {
   const candidateName = resolveCandidateName(doc.candidate_name);
   const creationDate = doc.creation_date || doc.created_date
@@ -666,10 +662,20 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
   const introSection = findSection('introduction', 'career_vision');
   const introduction = getSectionText(introSection);
 
+  // 各期間のセクション
+  const shortSection = findSection('short_term', 'short_term_plan');
+  const midSection = findSection('mid_term', 'mid_term_plan');
+  const longSection = findSection('long_term', 'long_term_plan');
+
   // 各期間のフィールド抽出
-  const short = extractPeriodFields(findSection('short_term', 'short_term_plan'));
-  const mid = extractPeriodFields(findSection('mid_term', 'mid_term_plan'));
-  const long = extractPeriodFields(findSection('long_term', 'long_term_plan'));
+  const short = extractPeriodFields(shortSection);
+  const mid = extractPeriodFields(midSection);
+  const long = extractPeriodFields(longSection);
+
+  // テーマ（heading 副題）
+  const shortTheme = extractTheme(shortSection);
+  const midTheme = extractTheme(midSection);
+  const longTheme = extractTheme(longSection);
 
   // ポテンシャル — content.potentials(旧) / section直下 list_items(新) を両対応
   const potentialSection = findSection('hidden_potential', 'potential');
@@ -704,21 +710,18 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
     }
   }
 
-  // キャリアロードマップ — ドキュメント直下の summary.roadmap_table またはセクション内
+  // ロードマップ目標 — summary.roadmap_table から phase をキーに引き当て
   const topRoadmapTable = (doc as unknown as {
-    summary?: { roadmap_table?: Array<{ phase: string; period: string; goal: string; income: string }> };
+    summary?: { roadmap_table?: Array<{ phase: string; period?: string; goal?: string; income?: string }> };
   }).summary?.roadmap_table;
-  let roadmap = '';
-  if (Array.isArray(topRoadmapTable) && topRoadmapTable.length > 0) {
-    const header = 'フェーズ | 期間 | 目標 | 目標年収';
-    const rows = topRoadmapTable.map(r => `${r.phase} | ${r.period} | ${r.goal} | ${r.income}`);
-    roadmap = [header, ...rows].join('\n');
-  } else {
-    const summarySection = findSection('conclusion', 'summary');
-    if (summarySection && isRecord(summarySection) && isRecord(summarySection.content)) {
-      roadmap = formatRoadmap(summarySection.content as CareerPlanSectionContent);
-    }
-  }
+  const roadmapGoal = (phaseKey: string): string => {
+    if (!Array.isArray(topRoadmapTable)) return '';
+    const row = topRoadmapTable.find(r => typeof r.phase === 'string' && r.phase.includes(phaseKey));
+    return row?.goal || '';
+  };
+  const shortRoadmapGoal = roadmapGoal('短期');
+  const midRoadmapGoal = roadmapGoal('中期');
+  const longRoadmapGoal = roadmapGoal('長期');
 
   // まとめ closing text
   let closing = '';
@@ -731,25 +734,30 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
     候補者名: candidateName,
     作成日: creationDate,
     はじめに: introduction,
+    短期_テーマ: shortTheme,
     短期_目標: short.目標,
     短期_推奨職種: short.推奨職種,
     短期_目標年収: short.目標年収,
     短期_習得すべきスキル: short.習得すべきスキル,
     短期_キャリア戦略: short.キャリア戦略,
+    短期_ロードマップ目標: shortRoadmapGoal,
+    中期_テーマ: midTheme,
     中期_目標: mid.目標,
     中期_推奨職種: mid.推奨職種,
     中期_目標年収: mid.目標年収,
     中期_習得すべきスキル: mid.習得すべきスキル,
     中期_キャリア戦略: mid.キャリア戦略,
+    中期_ロードマップ目標: midRoadmapGoal,
+    長期_テーマ: longTheme,
     長期_目標: long.目標,
     長期_推奨職種: long.推奨職種,
     長期_目標年収: long.目標年収,
     長期_習得すべきスキル: long.習得すべきスキル,
     長期_キャリア戦略: long.キャリア戦略,
+    長期_ロードマップ目標: longRoadmapGoal,
     ポテンシャル: potentials,
     総括: summaryText,
     まとめ: closing,
-    キャリアロードマップ: roadmap,
     元データJSON: JSON.stringify(doc, null, 2),
   };
 }
