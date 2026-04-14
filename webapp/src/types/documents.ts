@@ -443,6 +443,7 @@ export interface RecommendationBaseRecord {
   作成日: string;
   更新日時: string;
   推薦者: string;
+  キャッチフレーズ: string;
   候補者概要: string;
   転職理由: string;
   推薦理由: string;

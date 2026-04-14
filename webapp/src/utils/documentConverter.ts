@@ -359,8 +359,21 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
   const findSection = (...ids: string[]) => doc.sections.find(s => ids.includes(s.section_id));
 
   // Text sections — 新旧 section_id と 文字列/オブジェクト両形式の content に対応
+  // 候補者概要: キャッチフレーズ(catchphrase) と 本文(description/text) を分離して保持
   const overviewSection = findSection('candidate_overview', 'overview');
-  const overview = getSectionText(overviewSection);
+  let catchphrase = '';
+  let overview = '';
+  if (overviewSection) {
+    const content = getSectionContent(overviewSection);
+    if (typeof content === 'string') {
+      overview = content;
+    } else if (isRecord(content)) {
+      const c = content as { catchphrase?: unknown; description?: unknown; text?: unknown };
+      if (typeof c.catchphrase === 'string') catchphrase = c.catchphrase;
+      if (typeof c.description === 'string') overview = c.description;
+      else if (typeof c.text === 'string') overview = c.text;
+    }
+  }
 
   const reasonSection = findSection('reason_for_change', 'reason_for_job_change');
   const reason = getSectionText(reasonSection);
@@ -505,6 +518,7 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
     作成日: creationDate,
     更新日時: lastUpdated,
     推薦者: recommender,
+    キャッチフレーズ: catchphrase,
     候補者概要: overview,
     転職理由: reason,
     推薦理由: recommendationReasons,

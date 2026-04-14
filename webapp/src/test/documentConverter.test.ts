@@ -587,9 +587,10 @@ describe('convertRecommendation', () => {
     expect(result.候補者名).toBe('海田結乃');
     expect(result.作成日).toBe('2026年04月14日');
     expect(result.更新日時).toBe('2026年04月14日');
-    expect(result.候補者概要).toBe(
-      '「20歳での正社員化を自ら完遂した実行力と、厳しい現場で磨かれた冷静なコミュニケーション力」\n第一印象は非常に落ち着いており...'
+    expect(result.キャッチフレーズ).toBe(
+      '「20歳での正社員化を自ら完遂した実行力と、厳しい現場で磨かれた冷静なコミュニケーション力」'
     );
+    expect(result.候補者概要).toBe('第一印象は非常に落ち着いており...');
     expect(result.推薦理由).toContain('1. 逆境を突破する「誠実な継続性」...');
     expect(result.推薦理由).toContain('生命保険営業という...');
     expect(result.主要本文).toBe('「お客様のために」という想いを持ちつつも...');
