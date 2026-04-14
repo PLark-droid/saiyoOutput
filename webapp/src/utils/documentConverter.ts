@@ -656,16 +656,25 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
     || doc.footer?.creation_date
     || (doc as unknown as { last_updated?: string }).last_updated || '';
 
-  const findSection = (...ids: string[]) => doc.sections.find(s => ids.includes(s.section_id));
+  // section_id で検索 → 見つからなければ heading 正規表現で代替
+  const findSection = (ids: string[], headingPattern?: RegExp) => {
+    const byId = doc.sections.find(s => ids.includes((s as { section_id?: string }).section_id ?? ''));
+    if (byId) return byId;
+    if (!headingPattern) return undefined;
+    return doc.sections.find(s => {
+      const h = (s as { heading?: string }).heading;
+      return typeof h === 'string' && headingPattern.test(h);
+    });
+  };
 
   // はじめに
-  const introSection = findSection('introduction', 'career_vision');
+  const introSection = findSection(['introduction', 'career_vision'], /はじめに/);
   const introduction = getSectionText(introSection);
 
-  // 各期間のセクション
-  const shortSection = findSection('short_term', 'short_term_plan');
-  const midSection = findSection('mid_term', 'mid_term_plan');
-  const longSection = findSection('long_term', 'long_term_plan');
+  // 各期間のセクション — heading に「短期/中期/長期目標」が含まれるものをフォールバック検出
+  const shortSection = findSection(['short_term', 'short_term_plan'], /短期目標|短期計画/);
+  const midSection = findSection(['mid_term', 'mid_term_plan'], /中期目標|中期計画/);
+  const longSection = findSection(['long_term', 'long_term_plan'], /長期目標|長期計画/);
 
   // 各期間のフィールド抽出
   const short = extractPeriodFields(shortSection);
@@ -678,18 +687,20 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
   const longTheme = extractTheme(longSection);
 
   // ポテンシャル — content.potentials(旧) / section直下 list_items(新) を両対応
-  const potentialSection = findSection('hidden_potential', 'potential');
+  const potentialSection = findSection(['hidden_potential', 'potential'], /ポテンシャル|可能性/);
   let potentials = '';
   if (potentialSection) {
     const topListItems = (potentialSection as unknown as {
-      list_items?: Array<{ id?: string; title?: string; heading?: string; content?: string }>;
+      list_items?: Array<{ id?: string; title?: string; heading?: string; content?: string; detail?: string }>;
     }).list_items;
 
     if (Array.isArray(topListItems) && topListItems.length > 0) {
       potentials = topListItems
         .map((item, idx) => {
-          const heading = item.title || item.heading || '';
-          const text = item.content || '';
+          const rawHeading = item.title || item.heading || '';
+          // 既に "1. " プレフィックスがある場合は剥がして再採番
+          const heading = rawHeading.replace(/^\s*\d+[.．]\s*/, '');
+          const text = item.content || item.detail || '';
           return heading ? `${idx + 1}. ${heading}\n${text}` : text;
         })
         .join('\n\n');
@@ -704,7 +715,7 @@ export function convertCareerPlan(doc: CareerPlanDocument): CareerPlanBaseRecord
   if (topSummary && typeof topSummary.text === 'string') {
     summaryText = topSummary.text;
   } else {
-    const summarySection = findSection('conclusion', 'summary');
+    const summarySection = findSection(['conclusion', 'summary'], /総括|まとめ/);
     if (summarySection && isRecord(summarySection) && isRecord(summarySection.content)) {
       summaryText = formatConclusionSection(summarySection.content as CareerPlanSectionContent);
     }
