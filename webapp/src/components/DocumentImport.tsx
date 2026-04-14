@@ -8,6 +8,22 @@ import {
 import { safeJsonParse } from '../utils/jsonSanitizer';
 import type { DocumentType, CandidateName } from '../types/documents';
 
+type PreviewField = { name: string; value: string; filled: boolean };
+
+function buildPreviewFields(record: Record<string, unknown>): PreviewField[] {
+  return Object.entries(record)
+    .filter(([k]) => k !== '元データJSON')
+    .map(([name, raw]) => {
+      const value =
+        raw === null || raw === undefined
+          ? ''
+          : typeof raw === 'string'
+            ? raw
+            : String(raw);
+      return { name, value, filled: value.trim().length > 0 };
+    });
+}
+
 function resolveName(name: CandidateName | undefined): string {
   if (!name) return '';
   if (typeof name === 'string') return name;
@@ -26,7 +42,7 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
   const [previewData, setPreviewData] = useState<{
     type: DocumentType;
     candidateName: string;
-    fieldCount: number;
+    fields: PreviewField[];
   } | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -64,15 +80,18 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
       const candidateName = resolveName((parsed as any).candidate_name);
 
       const converted = convertDocument(validated);
-      const fieldCount = Object.keys(converted.record).length;
+      const fields = buildPreviewFields(converted.record as unknown as Record<string, unknown>);
+      const filledCount = fields.filter(f => f.filled).length;
 
       setPreviewData({
         type: docType,
         candidateName,
-        fieldCount,
+        fields,
       });
 
-      onSuccess?.(`✓ ${docType}として認識しました（候補者: ${candidateName}）`);
+      onSuccess?.(
+        `✓ ${docType}として認識しました（候補者: ${candidateName} / ${filledCount}/${fields.length}フィールド格納予定）`
+      );
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'JSONのパースに失敗しました';
       setValidationError(`JSONパースエラー: ${errorMessage}`);
@@ -205,9 +224,45 @@ export function DocumentImport({ onSuccess, onError }: DocumentImportProps) {
                   <td>{previewData.candidateName}</td>
                 </tr>
                 <tr>
-                  <th>フィールド数</th>
-                  <td>{previewData.fieldCount}項目</td>
+                  <th>フィールド充足率</th>
+                  <td>
+                    {previewData.fields.filter(f => f.filled).length} / {previewData.fields.length} 項目
+                  </td>
                 </tr>
+              </tbody>
+            </table>
+
+            <h3 style={{ marginTop: '1rem' }}>フィールド格納プレビュー</h3>
+            <p className="preview-hint">
+              <span className="filled-marker">●</span> 格納あり &nbsp;&nbsp;
+              <span className="empty-marker">○</span> 空（JSONに対応データ無し）
+            </p>
+            <table className="preview-fields-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '30px' }}></th>
+                  <th style={{ width: '180px' }}>フィールド名</th>
+                  <th>格納される値</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previewData.fields.map(field => (
+                  <tr key={field.name} className={field.filled ? 'row-filled' : 'row-empty'}>
+                    <td style={{ textAlign: 'center' }}>
+                      <span className={field.filled ? 'filled-marker' : 'empty-marker'}>
+                        {field.filled ? '●' : '○'}
+                      </span>
+                    </td>
+                    <td><strong>{field.name}</strong></td>
+                    <td className="field-value-cell">
+                      {field.filled ? (
+                        <pre className="field-value">{field.value}</pre>
+                      ) : (
+                        <span className="field-empty-text">（空）</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
