@@ -184,6 +184,8 @@ export interface TextSection {
     | 'reason_for_change'
     | 'candidate_aspiration'
     | 'vision'
+    | 'matching'
+    | 'main_body'
     | 'overall_assessment'
     | 'total_review'
     | 'summary';
@@ -194,11 +196,13 @@ export interface TextSection {
     | {
       text?: string;
       closing?: string;
+      catchphrase?: string;
+      description?: string;
     };
 }
 
 export interface RecommendationReasonSection {
-  section_id: 'recommendation_reason' | 'recommendation_reasons';
+  section_id: 'recommendation_reason' | 'recommendation_reasons' | 'recommendation_points';
   heading: string;
   heading_level?: string;
   content?: {
@@ -233,12 +237,15 @@ export interface RecommendationReason {
 export interface ConditionsSection {
   section_id: 'conditions';
   heading: string;
-  heading_level: string;
-  content: {
+  heading_level?: string;
+  content?: {
     table?: {
       rows: ConditionRow[];
     };
     list_items?: ConditionListItem[];
+  };
+  table?: {
+    rows: ConditionRow[];
   };
 }
 
@@ -434,15 +441,21 @@ export interface CareerHistoryBaseRecord {
 export interface RecommendationBaseRecord {
   候補者名: string;
   作成日: string;
+  更新日時: string;
+  推薦者: string;
   候補者概要: string;
   転職理由: string;
   推薦理由: string;
   志向性と将来性: string;
   総評: string;
+  まとめ: string;
+  主要本文: string;
   希望年収: string;
   転職時期: string;
+  入社希望時期: string;
   希望勤務地: string;
   希望休日: string;
+  希望働き方: string;
   希望職種: string;
   その他条件: string;
   元データJSON: string;

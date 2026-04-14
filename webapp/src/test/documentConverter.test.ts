@@ -207,6 +207,52 @@ const sampleRecommendationNewFormat: RecommendationDocument = {
   },
 };
 
+const sampleRecommendationMatchingFormat: RecommendationDocument = {
+  document_type: '推薦文',
+  last_updated: '2026年04月14日',
+  candidate_name: '海田結乃',
+  sections: [
+    {
+      section_id: 'overview',
+      heading: '■候補者概要',
+      content: {
+        catchphrase: '「20歳での正社員化を自ら完遂した実行力と、厳しい現場で磨かれた冷静なコミュニケーション力」',
+        description: '第一印象は非常に落ち着いており...',
+      },
+    },
+    {
+      section_id: 'reason_for_change',
+      heading: '■転職理由',
+      content: '現職での貢献意欲は非常に高いものの...',
+    },
+    {
+      section_id: 'recommendation_points',
+      heading: '■推薦理由',
+      list_items: [
+        { heading: '1. 逆境を突破する「誠実な継続性」...', content: '生命保険営業という...' },
+        { heading: '2. 若さと落ち着きのギャップが生む...', content: '年齢を問わず...' },
+        { heading: '3. 目標完遂への執着と...', content: '「締め切りや約束を必ず守る」...' },
+      ],
+    },
+    {
+      section_id: 'matching',
+      heading: 'マッチング論',
+      content: '「お客様のために」という想いを持ちつつも...',
+    },
+    {
+      section_id: 'conditions',
+      heading: '■条件面・定着性',
+      table: {
+        rows: [
+          { item: '希望年収', detail: '300万円程度（ボーナス支給がある環境を希望）' },
+          { item: '転職時期', detail: '7月1日入社（引き継ぎおよび有給消化を考慮し、5月中の内定を希望）' },
+          { item: '長期定着性', detail: '神奈川県茅ヶ崎市在住...' },
+        ],
+      },
+    },
+  ],
+};
+
 const sampleCareerPlan: CareerPlanDocument = {
   document_type: 'キャリアプラン',
   candidate_name: '山田太郎',
@@ -492,11 +538,21 @@ describe('convertRecommendation', () => {
 
     expect(result.候補者名).toBe('山田太郎');
     expect(result.作成日).toBe('2025年12月23日');
+    expect(result.更新日時).toBe('');
+    expect(result.推薦者).toBe('テストアドバイザー');
     expect(result.候補者概要).toBe('山田様は優秀な人材です。');
     expect(result.転職理由).toBe('キャリアアップのため。');
     expect(result.推薦理由).toContain('技術力');
+    expect(result.まとめ).toBe('強く推薦します。');
+    expect(result.主要本文).toBe('');
     expect(result.希望年収).toBe('500万円以上');
+    expect(result.転職時期).toBe('2025年4月');
+    expect(result.入社希望時期).toBe('2025年4月');
     expect(result.希望勤務地).toBe('東京都内');
+    expect(result.希望休日).toBe('土日祝日休み');
+    expect(result.希望働き方).toBe('リモートワーク希望');
+    expect(result.希望職種).toBe('エンジニア');
+    expect(result.その他条件).toBe('特になし');
   });
 
   it('新形式の推薦文でも文字列contentで落ちずに変換する', () => {
@@ -506,17 +562,41 @@ describe('convertRecommendation', () => {
 
     expect(result.候補者名).toBe('石原智幸');
     expect(result.作成日).toBe('2026年4月9日');
+    expect(result.更新日時).toBe('2026年4月9日');
+    expect(result.推薦者).toBe('');
     expect(result.候補者概要).toBe('石原様は...');
     expect(result.転職理由).toBe('現職での「番頭」業務...');
     expect(result.推薦理由).toContain('圧倒的な安全管理実績');
     expect(result.志向性と将来性).toBe('石原様は...');
     expect(result.総評).toBe('人間性...');
+    expect(result.まとめ).toBe('');
+    expect(result.主要本文).toBe('');
     expect(result.希望年収).toBe('800万円〜900万円');
     expect(result.転職時期).toBe('決定後1〜2ヶ月');
+    expect(result.入社希望時期).toBe('決定後1〜2ヶ月');
     expect(result.希望勤務地).toBe('練馬区から30分圏内');
     expect(result.希望休日).toBe('完全週休二日制');
+    expect(result.希望働き方).toBe('');
     expect(result.希望職種).toBe('施工管理');
     expect(result.その他条件).toBe('転勤なし');
+  });
+
+  it('matching と section.table を使う新形式の推薦文を正しく変換する', () => {
+    const result = convertRecommendation(sampleRecommendationMatchingFormat);
+
+    expect(result.候補者名).toBe('海田結乃');
+    expect(result.作成日).toBe('2026年04月14日');
+    expect(result.更新日時).toBe('2026年04月14日');
+    expect(result.候補者概要).toBe(
+      '「20歳での正社員化を自ら完遂した実行力と、厳しい現場で磨かれた冷静なコミュニケーション力」\n第一印象は非常に落ち着いており...'
+    );
+    expect(result.推薦理由).toContain('1. 逆境を突破する「誠実な継続性」...');
+    expect(result.推薦理由).toContain('生命保険営業という...');
+    expect(result.主要本文).toBe('「お客様のために」という想いを持ちつつも...');
+    expect(result.希望年収).toBe('300万円程度（ボーナス支給がある環境を希望）');
+    expect(result.転職時期).toBe('7月1日入社（引き継ぎおよび有給消化を考慮し、5月中の内定を希望）');
+    expect(result.入社希望時期).toBe('7月1日入社（引き継ぎおよび有給消化を考慮し、5月中の内定を希望）');
+    expect(result.その他条件).toBe('神奈川県茅ヶ崎市在住...');
   });
 });
 

@@ -281,9 +281,17 @@ function getSectionContent(section: unknown): unknown {
 function getSectionText(section: unknown): string {
   const content = getSectionContent(section);
   if (typeof content === 'string') return content;
-  if (isRecord(content) && 'text' in content) {
-    const t = (content as { text?: unknown }).text;
-    return typeof t === 'string' ? t : '';
+  if (isRecord(content)) {
+    if ('text' in content) {
+      const t = (content as { text?: unknown }).text;
+      if (typeof t === 'string') return t;
+    }
+    const parts: string[] = [];
+    const catchphrase = (content as { catchphrase?: unknown }).catchphrase;
+    const description = (content as { description?: unknown }).description;
+    if (typeof catchphrase === 'string' && catchphrase) parts.push(catchphrase);
+    if (typeof description === 'string' && description) parts.push(description);
+    if (parts.length > 0) return parts.join('\n');
   }
   return '';
 }
@@ -344,6 +352,8 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
   const candidateName = resolveCandidateName(doc.candidate_name);
   const creationDate =
     doc.creation_date || doc.created_date || (doc as unknown as { last_updated?: string }).last_updated || '';
+  const lastUpdated = doc.last_updated || '';
+  const recommender = doc.footer?.recommender || '';
 
   // Get sections by ID
   const findSection = (...ids: string[]) => doc.sections.find(s => ids.includes(s.section_id));
@@ -356,10 +366,12 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
   const reason = getSectionText(reasonSection);
 
   // Recommendation reasons — 旧形式(content.reasons) と 新形式(section直下 list_items) を両対応
-  const recReasonSection = findSection('recommendation_reason', 'recommendation_reasons');
+  const recReasonSection = findSection('recommendation_reason', 'recommendation_reasons', 'recommendation_points');
   let recommendationReasons = '';
   let aspirationAndPotential = '';
   let overallAssessment = '';
+  let summary = '';
+  let mainBody = '';
 
   if (recReasonSection) {
     // 新形式: section 直下の list_items
@@ -372,7 +384,8 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
         .map((item, idx) => {
           const heading = item.title || item.heading || '';
           const text = item.content || item.description || '';
-          return heading ? `${idx + 1}. ${heading}\n${text}` : text;
+          const formattedHeading = /^\d+\.\s/.test(heading) ? heading : `${idx + 1}. ${heading}`;
+          return heading ? `${formattedHeading}\n${text}` : text;
         })
         .join('\n\n');
     } else {
@@ -417,6 +430,12 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
     }
   }
 
+  const summarySection = findSection('summary');
+  summary = getSectionText(summarySection);
+
+  const mainBodySection = findSection('matching', 'main_body');
+  mainBody = getSectionText(mainBodySection);
+
   // Conditions — セクション形式(table/list_items) と ドキュメント直下オブジェクト形式の両方に対応
   const conditionsSection = findSection('conditions');
   let conditionRows: ConditionTableRow[] = [];
@@ -431,6 +450,12 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
     if (content.table?.rows) conditionRows = content.table.rows;
     if (content.list_items) conditionListItems = content.list_items;
   }
+  if (conditionRows.length === 0 && conditionsSection && 'table' in conditionsSection) {
+    const table = (conditionsSection as { table?: { rows?: ConditionTableRow[] } }).table;
+    if (Array.isArray(table?.rows)) {
+      conditionRows = table.rows;
+    }
+  }
 
   // ドキュメント直下の conditions オブジェクト（新形式）
   const topLevelConditions = (doc as unknown as { conditions?: Record<string, string> }).conditions;
@@ -442,8 +467,10 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
   const topLevelConditionKeyMap: Record<string, string[]> = {
     希望年収: ['expected_annual_income', 'annual_income', 'income', 'salary'],
     転職時期: ['timing', 'start_timing', 'join_timing'],
+    入社希望時期: ['join_timing', 'start_timing', 'timing'],
     希望勤務地: ['location', 'work_location', 'preferred_location'],
     希望休日: ['holiday', 'holidays', 'days_off'],
+    希望働き方: ['work_style', 'working_style', 'employment_style'],
     希望職種: ['occupation', 'job_type', 'position'],
     その他条件: ['others', 'other', 'remarks', 'notes'],
   };
@@ -451,10 +478,12 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
   const legacyConditionLabelMap: Record<keyof typeof topLevelConditionKeyMap, string[]> = {
     希望年収: ['希望年収'],
     転職時期: ['転職時期', '入社希望時期', '希望時期'],
+    入社希望時期: ['入社希望時期', '転職時期', '希望時期'],
     希望勤務地: ['勤務地', '希望勤務地'],
     希望休日: ['休日', '希望休日'],
+    希望働き方: ['働き方', '希望働き方'],
     希望職種: ['職種', '希望職種'],
-    その他条件: ['その他', 'その他条件'],
+    その他条件: ['その他', 'その他条件', '長期定着性'],
   };
 
   const getConditionForLabel = (label: keyof typeof topLevelConditionKeyMap): string => {
@@ -474,15 +503,21 @@ export function convertRecommendation(doc: RecommendationDocument): Recommendati
   return {
     候補者名: candidateName,
     作成日: creationDate,
+    更新日時: lastUpdated,
+    推薦者: recommender,
     候補者概要: overview,
     転職理由: reason,
     推薦理由: recommendationReasons,
     志向性と将来性: aspirationAndPotential,
     総評: overallAssessment,
+    まとめ: summary,
+    主要本文: mainBody,
     希望年収: getConditionForLabel('希望年収'),
     転職時期: getConditionForLabel('転職時期'),
+    入社希望時期: getConditionForLabel('入社希望時期'),
     希望勤務地: getConditionForLabel('希望勤務地'),
     希望休日: getConditionForLabel('希望休日'),
+    希望働き方: getConditionForLabel('希望働き方'),
     希望職種: getConditionForLabel('希望職種'),
     その他条件: getConditionForLabel('その他条件'),
     元データJSON: JSON.stringify(doc, null, 2),
