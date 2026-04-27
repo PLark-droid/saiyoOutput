@@ -264,17 +264,29 @@ export class LarkClient {
       msg: string;
       data: {
         items: { field_name: string }[];
+        page_token?: string;
+        has_more?: boolean;
       };
     }
 
-    const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/fields`;
-    const response = await this.authRequest<FieldsResponse>('GET', url);
+    const fieldNames: string[] = [];
+    let pageToken: string | undefined;
 
-    if (response.code !== 0) {
-      throw new Error(`Failed to get table fields: ${response.msg}`);
-    }
+    do {
+      const params = new URLSearchParams({ page_size: '100' });
+      if (pageToken) params.set('page_token', pageToken);
+      const url = `/bitable/v1/apps/${this.baseAppToken}/tables/${tableId}/fields?${params.toString()}`;
+      const response = await this.authRequest<FieldsResponse>('GET', url);
 
-    return response.data.items.map((f) => f.field_name);
+      if (response.code !== 0) {
+        throw new Error(`Failed to get table fields: ${response.msg}`);
+      }
+
+      fieldNames.push(...response.data.items.map((f) => f.field_name));
+      pageToken = response.data.has_more ? response.data.page_token : undefined;
+    } while (pageToken);
+
+    return fieldNames;
   }
 
   /**
@@ -292,8 +304,12 @@ export class LarkClient {
       type: 1, // テキスト型
     });
 
-    // 1254043 = フィールドが既に存在する（エラーではない）
-    if (response.code !== 0 && response.code !== 1254043) {
+    // 1254014 / 1254043 = フィールド名重複（既に存在＝無害）。msg ベースでもフォールバック。
+    const isDuplicate =
+      response.code === 1254014 ||
+      response.code === 1254043 ||
+      /FieldNameDuplicated/i.test(response.msg ?? '');
+    if (response.code !== 0 && !isDuplicate) {
       throw new Error(`Failed to add field "${fieldName}": ${response.msg}`);
     }
   }
