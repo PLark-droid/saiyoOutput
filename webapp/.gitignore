@@ -29,6 +29,12 @@ dist-ssr
 *.sw?
 .vercel
 
-# Slack scripts with tokens
-webapp/scripts/getSlackMembers*.ts
-webapp/scripts/getChannelMembers.ts
+# Slack scripts with hardcoded tokens
+scripts/getSlackMembers*.ts
+scripts/getChannelMembers.ts
+
+# Local test data (may contain personal info)
+test-recommendation.json
+
+# Migration staging package (one-off snapshot, not version-controlled)
+migration-package/
