@@ -67,6 +67,23 @@ describe('jsonSanitizer', () => {
     expect(parsed.candidate_name).toBe('山田太郎');
   });
 
+  it('escapes embedded double quotes in string values', () => {
+    const input = `{
+      "catchphrase": "「対象者の"本当のニーズ"を汲み取る傾聴力」",
+      "next": "ok"
+    }`;
+
+    const parsed = safeJsonParse<{ catchphrase: string; next: string }>(input);
+    expect(parsed.catchphrase).toBe('「対象者の"本当のニーズ"を汲み取る傾聴力」');
+    expect(parsed.next).toBe('ok');
+  });
+
+  it('escapes multiple embedded quotes in a single value', () => {
+    const input = `{"a": "say "hi" and "bye" please"}`;
+    const parsed = safeJsonParse<{ a: string }>(input);
+    expect(parsed.a).toBe('say "hi" and "bye" please');
+  });
+
   it('quotes unquoted property names', () => {
     const input = `{document_type: "推薦文", candidate_name: "山田太郎"}`;
     const sanitized = sanitizeJson(input);

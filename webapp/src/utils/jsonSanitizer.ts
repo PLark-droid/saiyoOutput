@@ -274,6 +274,56 @@ function quoteUnquotedPropertyNames(input: string): string {
   return output;
 }
 
+function escapeEmbeddedQuotes(input: string): string {
+  let output = '';
+  let inString = false;
+  let escaped = false;
+
+  const isStructuralAfter = (i: number): boolean => {
+    let j = i + 1;
+    while (j < input.length && /\s/.test(input[j])) j += 1;
+    if (j >= input.length) return true;
+    const ch = input[j];
+    return ch === ',' || ch === '}' || ch === ']' || ch === ':';
+  };
+
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i];
+
+    if (!inString) {
+      output += ch;
+      if (ch === '"') inString = true;
+      continue;
+    }
+
+    if (escaped) {
+      output += ch;
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\') {
+      output += ch;
+      escaped = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      if (isStructuralAfter(i)) {
+        output += ch;
+        inString = false;
+      } else {
+        output += '\\"';
+      }
+      continue;
+    }
+
+    output += ch;
+  }
+
+  return output;
+}
+
 function removeTrailingCommas(input: string): string {
   let output = '';
   let inString = false;
@@ -328,7 +378,8 @@ export function sanitizeJson(input: string): string {
   const noBom = input.replace(/^\uFEFF/, '');
   const extracted = extractLikelyJson(noBom);
   const withoutComments = removeCommentsAndNormalizeQuotes(extracted);
-  const quotedKeys = quoteUnquotedPropertyNames(withoutComments);
+  const escapedQuotes = escapeEmbeddedQuotes(withoutComments);
+  const quotedKeys = quoteUnquotedPropertyNames(escapedQuotes);
   return removeTrailingCommas(quotedKeys).trim();
 }
 
